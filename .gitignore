@@ -1,0 +1,11 @@
+# รหัสลับ
+.env*
+!.env.example
+
+# ไฟล์ที่สร้างอัตโนมัติ
+node_modules/
+.next/
+out/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
