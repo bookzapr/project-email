@@ -1,36 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ระบบส่งอีเมลอัตโนมัติ + ส่งติดตามซ้ำ
 
-## Getting Started
+เว็บ: https://project-email.vercel.app · รายละเอียดความต้องการ: [SPEC.md](SPEC.md)
 
-First, run the development server:
+## ระบบทำงานอย่างไร
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+cron-job.org (ทุก 1 นาที) ──► Vercel /api/cron/tick
+                                ├─ 1) อ่านกล่องจดหมาย (IMAP): ใครส่งงานกลับ / อีเมลไหนเด้งกลับ
+                                └─ 2) ส่งอีเมลที่ถึงเวลา (SMTP) ทีละไม่เกิน 10 ฉบับ
+                                      อีเมลส่งซ้ำ: ส่งเฉพาะเมื่อข้อ 1 สำเร็จ
+Supabase (ฐานข้อมูล) ◄──── หน้าเว็บ (ล็อกอินด้วย ADMIN_PASSWORD)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## งานดูแลที่อาจต้องทำ
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| เรื่อง | ทำที่ไหน |
+|---|---|
+| เปลี่ยนเป็นอีเมลบริษัท (Google Workspace) | Vercel > Settings > Environment Variables: แก้ `GMAIL_USER`, `GMAIL_APP_PASSWORD` แล้ว Redeploy · หน้าเว็บ > ตั้งค่า: ขีดจำกัดต่อวันเป็น 1500 |
+| เปลี่ยนรหัสผ่านเข้าเว็บ | Vercel: แก้ `ADMIN_PASSWORD` แล้ว Redeploy (ทุกเครื่องจะถูกออกจากระบบ) |
+| App Password ถูกลบ / เปลี่ยนรหัส Google | สร้าง App Password ใหม่ แล้วแก้ `GMAIL_APP_PASSWORD` ใน Vercel + `.env.local` |
+| หน้าแรกขึ้นแถบแดง "ระบบส่งอัตโนมัติไม่ได้ทำงาน" | ดู cron-job.org ว่างานยังเปิดอยู่และผลเป็น 200 |
+| หน้าแรกขึ้นแถบแดง "ส่งอีเมลไม่ได้" / "ตรวจการส่งงานกลับไม่ได้" | ส่วนใหญ่เป็นเรื่อง App Password หรือ IMAP ถูกปิด |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+แก้โค้ดแล้ว `git push` — Vercel จะ deploy ใหม่ให้อัตโนมัติ
 
-## Learn More
+## คำสั่งบนเครื่อง (สำหรับพัฒนา/ทดสอบ)
 
-To learn more about Next.js, take a look at the following resources:
+```
+npm run dev          เปิดเว็บทดสอบที่ http://localhost:3000
+npm run cron:local   ตัวตั้งเวลาจำลองบนเครื่อง (ใช้คู่กับ dev)
+npm run test:db      ทดสอบฐานข้อมูล
+npm run test:gmail   ทดสอบล็อกอิน Gmail
+node --env-file=.env.local scripts/e2e-ui.mjs        ทดสอบหน้าเว็บ + การส่ง (ต้องเปิด dev + cron:local)
+node --env-file=.env.local scripts/e2e-replies.mjs   ทดสอบตรวจส่งงานกลับ + ส่งซ้ำ (ใช้กับเว็บจริงได้)
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+ฐานข้อมูล: รันไฟล์ใน `supabase/migrations/` ตามลำดับใน Supabase > SQL Editor (รันซ้ำได้)
