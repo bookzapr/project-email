@@ -6,7 +6,9 @@
 //   2) ส่งอีเมล — อีเมลส่งซ้ำจะส่งก็ต่อเมื่อข้อ 1 สำเร็จ (ไม่งั้นอาจส่งซ้ำไปหาคนที่ส่งงานแล้ว)
 import { createHash, timingSafeEqual } from "node:crypto";
 import { checkReplies, type ReplyCheckResult } from "@/lib/replies";
+import { db } from "@/lib/db";
 import { runSendRound } from "@/lib/sender";
+import { cleanupOrphanFiles } from "@/lib/storage";
 
 export const maxDuration = 60;
 
@@ -41,7 +43,17 @@ async function handle(request: Request) {
       // ถ้ารอบนี้ตรวจกล่องจดหมายไม่ได้ หรือมีรอบอื่นกำลังตรวจอยู่ ให้เลื่อนอีเมลส่งซ้ำไปรอบหน้า
       includeFollowup: replies !== null && replies.skipped !== "locked",
     });
-    return Response.json({ ok: true, replies, replyError, ...sent });
+    // วันละครั้ง: ลบไฟล์แนบ/รูปที่ค้าง (ล็อกไว้ 24 ชม. และไม่ปลดล็อก = ทำอีกครั้งพรุ่งนี้)
+    let cleanup: { removed: number } | null = null;
+    const { data: cleanupToken } = await db().rpc("try_job_lock", { p_name: "cleanup", p_seconds: 24 * 60 * 60 });
+    if (cleanupToken) {
+      cleanup = await cleanupOrphanFiles().catch((err) => {
+        console.error("[cron] ลบไฟล์ค้างไม่สำเร็จ:", err);
+        return null;
+      });
+    }
+
+    return Response.json({ ok: true, replies, replyError, ...sent, cleanup });
   } catch (err) {
     console.error("[cron] รอบนี้ผิดพลาด:", err);
     return Response.json({ ok: false, replies, replyError, error: (err as Error).message }, { status: 500 });

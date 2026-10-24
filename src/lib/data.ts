@@ -48,7 +48,8 @@ export async function getCampaignDetail(id: string): Promise<{ campaign: Campaig
 
 export async function getSettings(): Promise<Settings> {
   await requireAuth();
-  const { data, error } = await db().from("settings").select("id,sender_name,daily_limit,last_run_at,last_send_error,last_send_error_at,last_imap_check_at,last_imap_error").eq("id", 1).single();
+  // select("*") เพื่อให้ทำงานได้ทั้งก่อน/หลังรัน SQL 006 (คอลัมน์ signature_html)
+  const { data, error } = await db().from("settings").select("*").eq("id", 1).single();
   if (error) throw new Error("อ่านการตั้งค่าไม่ได้: " + error.message);
   return data as Settings;
 }

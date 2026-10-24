@@ -18,6 +18,12 @@ export function fillHtml(html: string, name: string): string {
   return html.replace(NAME_TOKEN, escapeHtml(name));
 }
 
+/** ต่อท้ายลายเซ็น (แบบ Gmail: ขึ้นบรรทัด "--" แล้วตามด้วยลายเซ็น) — ใช้ทั้งตัวอย่างบนเว็บและตอนส่งจริง */
+export function withSignature(html: string, signatureHtml: string | null | undefined): string {
+  if (isBlankHtml(signatureHtml) && !/<img/i.test(signatureHtml ?? "")) return html;
+  return `${html}<p style="color:#888888;margin-top:20px">--</p>${signatureHtml}`;
+}
+
 /** เนื้อหา HTML ว่างจริงๆ หรือไม่ (ตัวแก้ไขจะให้ "<p></p>" มาเมื่อไม่มีข้อความ) */
 export function isBlankHtml(html: string | null | undefined): boolean {
   if (!html) return true;

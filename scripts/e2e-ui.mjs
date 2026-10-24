@@ -1,9 +1,13 @@
-// ทดสอบหน้าเว็บ + การส่งอีเมลแบบอัตโนมัติ (ขั้นที่ 2–3) ด้วยเบราว์เซอร์จริง
-// ต้องเปิดเว็บที่ localhost:3000 และ npm run cron:local อยู่
-// ใช้:  node --env-file=.env.local scripts/e2e-ui.mjs
+// ทดสอบหน้าเว็บ + การส่งอีเมลแบบอัตโนมัติด้วยเบราว์เซอร์จริง (ใช้เวลา ~6 นาที)
+// ต้องมีตัวตั้งเวลาทำงานอยู่: cron-job.org (เว็บจริง) หรือ npm run cron:local (บนเครื่อง)
+// ใช้กับเว็บบนเครื่อง:  node --env-file=.env.local scripts/e2e-ui.mjs
+// ใช้กับเว็บจริง:       (PowerShell) $env:E2E_URL="https://project-email.vercel.app"; node --env-file=.env.local scripts/e2e-ui.mjs
 import { createClient } from "@supabase/supabase-js";
 import { ImapFlow } from "imapflow";
 import { chromium } from "playwright";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const BASE = process.env.E2E_URL ?? "http://localhost:3000";
 const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY, { auth: { persistSession: false } });
@@ -41,13 +45,28 @@ async function statuses(campaignId) {
   return Object.fromEntries(data.map((r) => [r.email, r]));
 }
 
-const { data: origSettings } = await db.from("settings").select("sender_name,daily_limit").eq("id", 1).single();
+const { data: settingsRow } = await db.from("settings").select("*").eq("id", 1).single();
+const has006 = settingsRow.signature_html !== undefined;
+const origSettings = {
+  sender_name: settingsRow.sender_name,
+  daily_limit: settingsRow.daily_limit,
+  ...(has006 ? { signature_html: settingsRow.signature_html } : {}),
+};
 const createdCampaigns = [];
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 page.on("dialog", (d) => d.accept());
 page.setDefaultTimeout(15_000);
+
+// ไฟล์ทดสอบ: PDF ชื่อไทย + รูป PNG (สร้างจากการแคปหน้าจอ)
+const tmp = join(tmpdir(), "pe-e2e-ui");
+mkdirSync(tmp, { recursive: true });
+const pdfFile = join(tmp, "เอกสารแนบ.pdf");
+writeFileSync(pdfFile, "%PDF-1.4\n%%EOF\n" + "z".repeat(20_000));
+await page.setContent('<div id="l" style="width:200px;height:60px;background:#0b5394;color:#fff;font:bold 24px Arial;display:flex;align-items:center;justify-content:center">E2E</div>');
+const pngFile = join(tmp, "logo.png");
+writeFileSync(pngFile, await page.locator("#l").screenshot());
 
 try {
   // =============================================================== ล็อกอิน
@@ -84,6 +103,38 @@ try {
     const html = await editor.innerHTML();
     assert(html.includes("{ชื่อ}"), "ไม่มี {ชื่อ} ในเนื้อหา");
     assert(/<strong>ข้อความตัวหนา<\/strong>/.test(html), "ตัวหนาไม่ทำงาน");
+    await page.getByRole("button", { name: "ตัวหนา" }).click();
+  });
+  await check("สร้างข้อความ ขั้น ①: สีตัวอักษร + ลิงก์ (หน้าต่าง) + แทรกรูป + แนบไฟล์", async () => {
+    const editor = page.locator(".ProseMirror").first();
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("ข้อความสีแดง");
+    await page.keyboard.press("Shift+Home");
+    await page.getByRole("button", { name: "สีข้อความ", exact: true }).click();
+    await page.getByLabel("สีตัวอักษร #cc0000").click();
+    await page.waitForTimeout(150);
+    await page.keyboard.press("ArrowRight");
+    await page.waitForTimeout(150);
+    await page.keyboard.press("Enter");
+    await page.getByRole("button", { name: "ใส่ลิงก์", exact: true }).click();
+    await page.fill("#link-text", "แบบฟอร์มออนไลน์");
+    await page.fill("#link-url", "example.com/form");
+    await page.getByRole("button", { name: "ตกลง" }).click();
+    let chooser = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "แทรกรูปภาพ", exact: true }).click();
+    await (await chooser).setFiles(pngFile);
+    await editor.locator("img").waitFor({ timeout: 20_000 });
+    chooser = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "แนบไฟล์" }).click();
+    await (await chooser).setFiles(pdfFile);
+    await page.getByLabel("เอาไฟล์ เอกสารแนบ.pdf ออก").waitFor({ timeout: 20_000 });
+    const html = await editor.innerHTML();
+    assert(/color:\s*(#cc0000|rgb\(204, 0, 0\))/.test(html), "ไม่มีสีแดง");
+    assert(/href="https:\/\/example.com\/form"/.test(html), "ไม่มีลิงก์");
+    await page.waitForTimeout(400);
+    const preview = page.locator("div.email-content").nth(1);
+    assert(await preview.locator("img").count(), "ตัวอย่างไม่มีรูป");
+    await page.getByText("ไฟล์แนบ 1 ไฟล์").waitFor();
     await page.getByRole("button", { name: "ถัดไป →" }).click();
     await page.getByText("วางรายชื่อทีเดียวหลายคน").waitFor();
   });
@@ -110,6 +161,14 @@ try {
     await page.getByText("รายชื่อที่จะเพิ่ม (2 คน)").waitFor();
     await page.getByRole("button", { name: "ถัดไป →" }).click();
     await page.getByText("จะส่งเมื่อไหร่?").waitFor();
+  });
+  await check("สร้างข้อความ ขั้น ③: ตัวเลือก 'แนบไฟล์ไปกับอีเมลส่งซ้ำด้วย'", async () => {
+    await page.getByRole("button", { name: "หลัง 1 วัน" }).click();
+    const box = page.getByRole("checkbox", { name: /แนบไฟล์ \(1 ไฟล์\) ไปกับอีเมลส่งซ้ำด้วย/ });
+    await box.waitFor();
+    const enabled = await box.isEnabled();
+    assert(enabled === has006, `ช่องติ๊ก ${enabled ? "เปิด" : "ปิด"} แต่ SQL 006 ${has006 ? "รันแล้ว" : "ยังไม่รัน"}`);
+    return has006 ? "ใช้ได้ (รัน SQL 006 แล้ว)" : "ปิดไว้พร้อมข้อความแนะนำให้รัน SQL 006";
   });
   await check("สร้างข้อความ ขั้น ③: สรุป + ตัวอย่างอีเมลแทนชื่อถูกต้อง", async () => {
     await page.getByRole("button", { name: "ไม่ส่งซ้ำ" }).click();
@@ -154,7 +213,7 @@ try {
     await tile.waitFor();
     assert((await tile.innerText()).includes("2"), `ตัวเลขไม่ตรง: ${await tile.innerText()}`);
   });
-  await check("อีเมลที่ได้รับ: ช่อง 'ถึง' มีคนเดียว + ชื่อถูกแทนค่า + มีตัวหนา", async () => {
+  await check("อีเมลที่ได้รับ: ช่อง 'ถึง' มีคนเดียว + ชื่อถูกแทนค่า + ไฟล์แนบ + รูปฝังในอีเมล", async () => {
     const client = new ImapFlow({
       host: "imap.gmail.com",
       port: 993,
@@ -176,10 +235,18 @@ try {
           60_000,
           `อีเมลถึง ${addr(k)}`,
         );
-        const [m] = await client.fetchAll(uids.slice(-1).join(","), { envelope: true, bodyParts: ["TEXT"] }, { uid: true });
+        const [m] = await client.fetchAll(uids.slice(-1).join(","), { envelope: true, bodyStructure: true }, { uid: true });
         const to = [...(m.envelope.to ?? []), ...(m.envelope.cc ?? [])].map((a) => a.address);
         assert(to.length === 1 && to[0] === addr(k), `ช่องถึง/สำเนา: ${to.join(", ")}`);
         assert(m.envelope.subject === `[ทดสอบ UI] เรียน คุณ${name}`, `หัวข้อ: ${m.envelope.subject}`);
+        const parts = [];
+        const walk = (n) => (n.childNodes ? n.childNodes.forEach(walk) : parts.push(n));
+        walk(m.bodyStructure);
+        assert(
+          parts.some((p) => p.disposition === "attachment" && p.dispositionParameters?.filename === "เอกสารแนบ.pdf"),
+          "ไม่มีไฟล์แนบ เอกสารแนบ.pdf",
+        );
+        assert(parts.some((p) => p.type.startsWith("image/") && p.id), "ไม่มีรูปฝังในอีเมล");
         found.push(`${k}: "${m.envelope.subject}"`);
       }
     } finally {
@@ -231,6 +298,21 @@ try {
     await page.getByRole("button", { name: "▶ ส่งต่อ" }).click();
     await waitUntil(async () => !(await db.from("campaigns").select("paused").eq("id", campaignId).single()).data.paused, 10_000, "บันทึก");
   });
+  await check("ดาวน์โหลดรายชื่อเป็น Excel (CSV ภาษาไทย) ตามกลุ่มที่กรอง", async () => {
+    const all = await page.request.get(`${BASE}/campaigns/${campaignId}/export?filter=all`);
+    assert(all.ok(), `สถานะ ${all.status()}`);
+    const buf = await all.body();
+    assert(buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf, "ไม่มี BOM (Excel จะแสดงภาษาไทยเพี้ยน)");
+    const text = buf.toString("utf8");
+    assert(text.includes("ชื่อ,อีเมล,สถานะ"), "หัวตารางไม่ถูกต้อง");
+    assert(text.includes("ยูไอหนึ่ง") && text.includes("ยูไอสอง"), "ไม่มีรายชื่อ");
+    const replied = (await (await page.request.get(`${BASE}/campaigns/${campaignId}/export?filter=replied`)).text()).trim();
+    assert(replied.split(/\r?\n/).length === 1, "กลุ่ม 'ส่งงานแล้ว' ควรมีแต่หัวตาราง");
+    const anon = await fetch(`${BASE}/campaigns/${campaignId}/export`, { redirect: "manual" });
+    assert(anon.status !== 200, "คนที่ไม่ได้ล็อกอินดาวน์โหลดได้!");
+    await page.getByRole("link", { name: "⬇ Excel" }).waitFor();
+    return `${text.trim().split(/\r?\n/).length - 1} แถว · ไม่ล็อกอินโหลดไม่ได้ (${anon.status})`;
+  });
   await check("ปุ่มทดสอบส่งหาตัวเอง (หน้ารายละเอียด)", async () => {
     await page.getByRole("button", { name: "ทดสอบส่งหาตัวเอง" }).click();
     await page.getByText(/ส่งแล้วไปที่/).waitFor({ timeout: 30_000 });
@@ -254,6 +336,25 @@ try {
     assert(data.sender_name === "ระบบทดสอบ UI", "ไม่ได้บันทึก");
   });
   await db.from("settings").update({ sender_name: origSettings.sender_name }).eq("id", 1);
+  await check("หน้าตั้งค่า: ลายเซ็นท้ายอีเมล", async () => {
+    await page.goto(`${BASE}/settings`);
+    if (!has006) {
+      await page.getByText(/ต้องรัน SQL ไฟล์/).waitFor();
+      return "ยังไม่รัน SQL 006 — แสดงข้อความแนะนำถูกต้อง";
+    }
+    const editor = page.locator(".ProseMirror").first();
+    await editor.click();
+    await page.keyboard.press("Control+A");
+    await page.keyboard.type("ลายเซ็นทดสอบ E2E");
+    await page.getByRole("button", { name: "บันทึก", exact: true }).click();
+    await page.getByText("บันทึกการตั้งค่าแล้ว").waitFor();
+    const { data } = await db.from("settings").select("signature_html").eq("id", 1).single();
+    assert(data.signature_html.includes("ลายเซ็นทดสอบ E2E"), "ไม่ได้บันทึกลายเซ็น");
+    await page.goto(`${BASE}/campaigns/new`);
+    await page.getByText("ลายเซ็นทดสอบ E2E").waitFor();
+    return "บันทึกได้ และแสดงในตัวอย่างอีเมล";
+  });
+  if (has006) await db.from("settings").update({ signature_html: origSettings.signature_html }).eq("id", 1);
 
   // =============================================================== โควตา (ขั้นที่ 3)
   await check("โควตา: ส่งไม่เกินขีดจำกัด และส่งต่อเองเมื่อโควตาว่าง", async () => {
@@ -318,18 +419,22 @@ try {
       if (over > 1) bad.push(`${label} (+${over}px)`);
       if (label === "ขั้น ②") await m.getByRole("button", { name: "ถัดไป →" }).click();
     }
-    await m.screenshot({ path: "scripts/_mobile-step3.png", fullPage: true });
     await m.close();
     assert(bad.length === 0, `ล้นจอ: ${bad.join(", ")}`);
   });
 
   // =============================================================== ลบข้อความ (ปุ่มในหน้าเว็บ)
-  await check("ปุ่มลบข้อความ", async () => {
+  await check("ปุ่มลบข้อความ + ไฟล์แนบ/รูปใน Storage ถูกลบด้วย", async () => {
+    const { data: c } = await db.from("campaigns").select("attachments,body_html").eq("id", campaignId).single();
+    const attPath = c.attachments[0]?.path;
+    const imgPath = c.body_html.match(/email-images\/([^"]+)"/)?.[1];
     await page.goto(`${BASE}/campaigns/${campaignId}`);
     await page.getByRole("button", { name: "ลบข้อความ" }).click();
     await page.getByRole("heading", { name: "ข้อความทั้งหมด" }).waitFor();
     const { data } = await db.from("campaigns").select("id").eq("id", campaignId);
     assert(data.length === 0, "ยังไม่ถูกลบ");
+    if (attPath) assert(!(await db.storage.from("attachments").exists(attPath)).data, "ไฟล์แนบยังค้างใน Storage");
+    if (imgPath) assert(!(await db.storage.from("email-images").exists(imgPath)).data, "รูปยังค้างใน Storage");
   });
 } finally {
   await browser.close();

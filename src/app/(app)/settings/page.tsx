@@ -20,5 +20,12 @@ export default function SettingsPage() {
 async function Settings() {
   const s = await getSettings();
   const senderEmail = process.env.GMAIL_USER || "(ยังไม่ได้ตั้ง GMAIL_USER)";
-  return <SettingsForm senderEmail={senderEmail} senderName={s.sender_name} dailyLimit={s.daily_limit} />;
+  return (
+    <SettingsForm
+      senderEmail={senderEmail}
+      senderName={s.sender_name}
+      dailyLimit={s.daily_limit}
+      signatureHtml={s.signature_html ?? null}
+    />
+  );
 }

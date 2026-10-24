@@ -81,6 +81,46 @@ export function imagePathsInAll(htmls: (string | null)[]): string[] {
   return [...new Set(htmls.flatMap((h) => (h ? imagePathsIn(h) : [])))];
 }
 
+/**
+ * ลบไฟล์ค้าง: ไฟล์ที่อัปโหลดเกิน 24 ชั่วโมงแล้วแต่ไม่มีข้อความ/ลายเซ็นไหนใช้
+ * (เช่น แนบไฟล์แล้วกดยกเลิกโดยไม่บันทึก หรือเปลี่ยนรูปในลายเซ็น)
+ */
+export async function cleanupOrphanFiles(): Promise<{ removed: number }> {
+  const [{ data: camps, error }, { data: settings }] = await Promise.all([
+    db().from("campaigns").select("*"),
+    db().from("settings").select("*").eq("id", 1).single(),
+  ]);
+  if (error) throw new Error("อ่านข้อความไม่ได้: " + error.message);
+
+  const usedAtt = new Set((camps ?? []).flatMap((c) => ((c.attachments ?? []) as Attachment[]).map((a) => a.path)));
+  const usedImg = new Set(
+    imagePathsInAll([...(camps ?? []).flatMap((c) => [c.body_html, c.followup_body_html]), settings?.signature_html ?? ""]),
+  );
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+
+  let removed = 0;
+  for (const [bucket, used] of [
+    [ATTACH_BUCKET, usedAtt],
+    [IMAGE_BUCKET, usedImg],
+  ] as const) {
+    const stale: string[] = [];
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error: e } = await db().storage.from(bucket).list("", { limit: 1000, offset });
+      if (e) throw new Error(`อ่านรายการไฟล์ใน ${bucket} ไม่ได้: ${e.message}`);
+      for (const f of data ?? []) {
+        // f.id = null คือโฟลเดอร์ ข้ามไป
+        if (f.id && f.created_at && !used.has(f.name) && new Date(f.created_at).getTime() < cutoff) stale.push(f.name);
+      }
+      if (!data || data.length < 1000) break;
+    }
+    for (let i = 0; i < stale.length; i += 100) {
+      await db().storage.from(bucket).remove(stale.slice(i, i + 100));
+    }
+    removed += stale.length;
+  }
+  return { removed };
+}
+
 /** ลบไฟล์แนบ/รูปที่ไม่ใช้แล้ว */
 export async function deleteFiles(attachmentPaths: string[], imagePaths: string[]) {
   if (attachmentPaths.length) await db().storage.from(ATTACH_BUCKET).remove(attachmentPaths);

@@ -2,7 +2,10 @@
 
 import { AttachmentList } from "@/components/attachment-bar";
 import type { Attachment } from "@/lib/attachments";
-import { fillHtml, fillText, isBlankHtml } from "@/lib/template";
+import { fillHtml, fillText, isBlankHtml, withSignature } from "@/lib/template";
+
+/** ผู้ส่งที่ผู้รับจะเห็น + ลายเซ็นท้ายอีเมล */
+export type SenderInfo = { name: string; email: string; signature?: string };
 
 /** ตัวอย่างอีเมลหน้าตาแบบที่ผู้รับเปิดดูใน Gmail ({ชื่อ} ถูกแทนด้วย sampleName แล้ว) */
 export function EmailPreview({
@@ -16,7 +19,7 @@ export function EmailPreview({
   subject: string;
   html: string;
   sampleName: string;
-  sender: { name: string; email: string };
+  sender: SenderInfo;
   label?: string;
   attachments?: Attachment[];
 }) {
@@ -46,7 +49,7 @@ export function EmailPreview({
         {isBlankHtml(html) ? (
           <p className="text-slate-400">(ยังไม่มีเนื้อหา)</p>
         ) : (
-          <div dangerouslySetInnerHTML={{ __html: fillHtml(html, sampleName) }} />
+          <div dangerouslySetInnerHTML={{ __html: fillHtml(withSignature(html, sender.signature), sampleName) }} />
         )}
       </div>
       {attachments && attachments.length > 0 && (

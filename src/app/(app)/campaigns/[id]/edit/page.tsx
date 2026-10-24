@@ -32,7 +32,8 @@ async function EditForm({ params }: { params: PageProps<"/campaigns/[id]/edit">[
       </p>
       <CampaignWizard
         mode="edit"
-        sender={{ name: settings.sender_name, email: process.env.GMAIL_USER ?? "" }}
+        sender={{ name: settings.sender_name, email: process.env.GMAIL_USER ?? "", signature: settings.signature_html }}
+        followupAttachAvailable={settings.signature_html !== undefined}
         cancelHref={`/campaigns/${c.id}`}
         onUpdate={updateCampaign.bind(null, c.id)}
         onTest={sendTestDraft}
@@ -43,6 +44,7 @@ async function EditForm({ params }: { params: PageProps<"/campaigns/[id]/edit">[
           send_at_local: toBangkokInput(c.send_at),
           followup_minutes: c.followup_after_minutes,
           attachments: c.attachments ?? [],
+          followup_attach: Boolean(c.followup_attach),
         }}
       />
     </>

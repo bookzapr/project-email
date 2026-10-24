@@ -45,7 +45,8 @@ export async function runSendRound(opts: {
   const startedAt = Date.now();
   const result: RoundResult = { claimed: 0, sent: 0, failed: 0, willRetry: 0, skipped: 0 };
 
-  const { data: settings, error: se } = await db().from("settings").select("sender_name").eq("id", 1).single();
+  // select("*") เพื่อให้ทำงานได้ทั้งก่อน/หลังรัน SQL 006 (signature_html)
+  const { data: settings, error: se } = await db().from("settings").select("*").eq("id", 1).single();
   if (se) throw new Error("อ่านการตั้งค่าไม่ได้: " + se.message);
   await db().from("settings").update({ last_run_at: new Date().toISOString() }).eq("id", 1);
 
@@ -63,14 +64,20 @@ export async function runSendRound(opts: {
   const transport = createTransport();
 
   // ไฟล์แนบ/รูป: โหลดครั้งเดียวต่อข้อความ ใช้ซ้ำกับทุกผู้รับในรอบนี้
-  const filesCache = new Map<string, Promise<MailFiles>>();
+  const signatureHtml: string = settings.signature_html ?? "";
+  const filesCache = new Map<string, Promise<{ files: MailFiles; attachToFollowup: boolean }>>();
   const filesFor = (row: ClaimedRow) => {
     if (!filesCache.has(row.campaign_id)) {
       filesCache.set(
         row.campaign_id,
         (async () => {
-          const { data } = await db().from("campaigns").select("attachments").eq("id", row.campaign_id).single();
-          return loadMailFiles((data?.attachments ?? []) as Attachment[], [row.body_html, row.followup_body_html]);
+          const { data } = await db().from("campaigns").select("*").eq("id", row.campaign_id).single();
+          const files = await loadMailFiles((data?.attachments ?? []) as Attachment[], [
+            row.body_html,
+            row.followup_body_html,
+            signatureHtml,
+          ]);
+          return { files, attachToFollowup: Boolean(data?.followup_attach) };
         })(),
       );
     }
@@ -103,7 +110,7 @@ export async function runSendRound(opts: {
       }
 
       try {
-        const files = await filesFor(row);
+        const { files, attachToFollowup } = await filesFor(row);
         const messageId = await sendEmail(transport, {
           kind: row.kind,
           toName: row.name,
@@ -114,6 +121,8 @@ export async function runSendRound(opts: {
           originalMessageId: row.message_id,
           senderName: settings.sender_name,
           files,
+          attachToFollowup,
+          signatureHtml,
         });
         await complete(row, token, { p_success: true, p_message_id: messageId });
         result.sent++;

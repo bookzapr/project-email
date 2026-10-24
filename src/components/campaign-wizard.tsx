@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { AttachmentBar } from "@/components/attachment-bar";
-import { EmailPreview } from "@/components/email-preview";
+import { EmailPreview, type SenderInfo } from "@/components/email-preview";
 import type { Attachment } from "@/lib/attachments";
 import { RecipientPicker } from "@/components/recipient-picker";
 import { RichTextEditor } from "@/components/rich-text-editor";
@@ -30,6 +30,7 @@ export type WizardInitial = {
   send_at_local: string;
   followup_minutes: number;
   attachments: Attachment[];
+  followup_attach?: boolean;
 };
 
 export function CampaignWizard({
@@ -40,11 +41,14 @@ export function CampaignWizard({
   onUpdate,
   onTest,
   sender,
+  followupAttachAvailable,
 }: {
   mode: "create" | "edit";
   initial: WizardInitial;
+  /** ตัวเลือกแนบไฟล์ในอีเมลส่งซ้ำ ใช้ได้หลังรัน SQL 006 */
+  followupAttachAvailable: boolean;
   /** ผู้ส่งที่ผู้รับจะเห็น (ใช้ในตัวอย่างอีเมล) */
-  sender: { name: string; email: string };
+  sender: SenderInfo;
   cancelHref: string;
   onCreate?: (draft: CampaignDraft, recipients: ParsedRecipient[]) => Promise<FormState>;
   onUpdate?: (draft: CampaignDraft) => Promise<FormState>;
@@ -79,6 +83,7 @@ export function CampaignWizard({
   const [customValue, setCustomValue] = useState(String(initialCustom.value));
   const [customUnit, setCustomUnit] = useState<DelayUnit>(initialCustom.unit);
   const [newFollowupText, setNewFollowupText] = useState(Boolean(initial.followup_body_html));
+  const [followupAttach, setFollowupAttach] = useState(Boolean(initial.followup_attach));
 
   const followupMinutes =
     followupChoice === "custom" ? Math.max(0, Math.floor(Number(customValue) || 0)) * UNIT_MINUTES[customUnit] : followupChoice;
@@ -91,6 +96,7 @@ export function CampaignWizard({
     send_at_local: sendAt,
     followup_minutes: followupMinutes,
     attachments,
+    followup_attach: followupAttach,
   });
 
   // ---- ไปขั้นถัดไป (ตรวจข้อมูลก่อน) ----
@@ -320,6 +326,25 @@ export function CampaignWizard({
                     minHeight="8rem"
                   />
                 )}
+                {attachments.length > 0 && (
+                  <label className="flex items-start gap-2 pt-1 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4"
+                      checked={followupAttach}
+                      disabled={!followupAttachAvailable}
+                      onChange={(e) => setFollowupAttach(e.target.checked)}
+                    />
+                    <span>
+                      แนบไฟล์ ({attachments.length} ไฟล์) ไปกับอีเมลส่งซ้ำด้วย
+                      <span className="block text-xs text-slate-500">
+                        {followupAttachAvailable
+                          ? "ถ้าไม่เลือก ผู้รับยังเปิดไฟล์จากอีเมลแรกในเธรดเดียวกันได้"
+                          : "ยังใช้ไม่ได้ — ต้องรัน SQL ไฟล์ 006 ใน Supabase ก่อน"}
+                      </span>
+                    </span>
+                  </label>
+                )}
               </div>
             )}
           </div>
@@ -421,7 +446,7 @@ function Summary(props: {
   sendNow: boolean;
   sendAt: string;
   followupMinutes: number;
-  sender: { name: string; email: string };
+  sender: SenderInfo;
   fallbackName: string;
   attachments: Attachment[];
 }) {

@@ -22,10 +22,12 @@ const FILTERS: { key: Filter; label: string; match: (s: RecipientStatus) => bool
 type Optimistic = { id: string; action: RecipientAction };
 
 export function RecipientsPanel({
+  campaignId,
   recipients,
   onAction,
   onAdd,
 }: {
+  campaignId: string;
   recipients: Recipient[];
   onAction: (id: string, action: RecipientAction) => Promise<FormState>;
   onAdd: (list: ParsedRecipient[]) => Promise<FormState>;
@@ -111,13 +113,23 @@ export function RecipientsPanel({
                 </button>
               ))}
             </div>
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="ค้นหาชื่อหรืออีเมล"
-              className="input py-1.5 text-sm sm:ml-auto sm:w-56"
-              aria-label="ค้นหาผู้รับ"
-            />
+            <div className="flex gap-2 sm:ml-auto">
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="ค้นหาชื่อหรืออีเมล"
+                className="input min-w-0 py-1.5 text-sm sm:w-56"
+                aria-label="ค้นหาผู้รับ"
+              />
+              <a
+                href={`/campaigns/${campaignId}/export?filter=${filter}`}
+                download
+                className="btn shrink-0 py-1.5"
+                title="ดาวน์โหลดรายชื่อกลุ่มที่เลือกอยู่ เปิดด้วย Excel ได้"
+              >
+                ⬇ Excel
+              </a>
+            </div>
           </div>
 
           {actionError && <p className="alert-error m-3">{actionError}</p>}

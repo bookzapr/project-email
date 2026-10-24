@@ -43,6 +43,7 @@ async function Detail({ params, searchParams }: Pick<Props, "params" | "searchPa
       )}
       <Header c={c} />
       <RecipientsPanel
+        campaignId={c.id}
         recipients={recipients}
         onAction={recipientAction}
         onAdd={addRecipients.bind(null, c.id)}

@@ -28,7 +28,8 @@ async function NewForm() {
   return (
     <CampaignWizard
       mode="create"
-      sender={{ name: settings.sender_name, email: process.env.GMAIL_USER ?? "" }}
+      sender={{ name: settings.sender_name, email: process.env.GMAIL_USER ?? "", signature: settings.signature_html }}
+      followupAttachAvailable={settings.signature_html !== undefined}
       cancelHref="/"
       onCreate={createCampaignWithRecipients}
       onTest={sendTestDraft}

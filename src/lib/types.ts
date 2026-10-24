@@ -29,6 +29,8 @@ export type Campaign = {
   followup_after_minutes: number;
   paused: boolean;
   attachments: Attachment[];
+  /** แนบไฟล์ไปกับอีเมลส่งซ้ำด้วย (มีหลังรัน SQL 006) */
+  followup_attach?: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -71,6 +73,8 @@ export type Settings = {
   last_send_error_at: string | null;
   last_imap_check_at: string | null;
   last_imap_error: string | null;
+  /** ลายเซ็นท้ายอีเมล (มีหลังรัน SQL 006 — ก่อนหน้านั้นเป็น undefined) */
+  signature_html?: string;
 };
 
 /** ผลลัพธ์ที่ Server Action ส่งกลับไปให้ฟอร์มแสดง */

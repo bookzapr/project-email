@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import nodemailer, { type Transporter } from "nodemailer";
 import type { MailFiles } from "./storage";
-import { fillHtml, fillText, isBlankHtml } from "./template";
+import { fillHtml, fillText, isBlankHtml, withSignature } from "./template";
 
 // ---------------------------------------------------------------------
 // การเชื่อมต่อ Gmail SMTP
@@ -42,8 +42,12 @@ export type OutgoingEmail = {
   /** Message-ID ของอีเมลรอบแรก (ใช้ผูกอีเมลส่งซ้ำให้อยู่ในเธรดเดียวกัน) */
   originalMessageId?: string | null;
   senderName: string;
-  /** ไฟล์แนบ + รูปในเนื้อหา (ไฟล์แนบส่งเฉพาะอีเมลรอบแรก อีเมลส่งซ้ำอยู่ในเธรดเดียวกันอยู่แล้ว) */
+  /** ไฟล์แนบ + รูปในเนื้อหา */
   files?: MailFiles;
+  /** แนบไฟล์ไปกับอีเมลส่งซ้ำด้วย (ค่าเริ่มต้น: แนบเฉพาะอีเมลรอบแรก) */
+  attachToFollowup?: boolean;
+  /** ลายเซ็นท้ายอีเมล (HTML) */
+  signatureHtml?: string;
 };
 
 // ค่าเดียวกับ .email-content ใน globals.css — ตัวอย่างบนเว็บจึงตรงกับที่ผู้รับเห็น
@@ -91,7 +95,7 @@ export async function sendEmail(transport: Transporter, email: OutgoingEmail): P
   const isFollowup = email.kind === "followup";
   const subject = fillText(email.subject, email.toName);
   const sourceHtml = isFollowup && !isBlankHtml(email.followupBodyHtml) ? email.followupBodyHtml! : email.bodyHtml;
-  let html = fillHtml(sourceHtml, email.toName);
+  let html = fillHtml(withSignature(sourceHtml, email.signatureHtml), email.toName);
   const messageId = newMessageId();
   const threadId = isFollowup ? email.originalMessageId : null;
 
@@ -103,7 +107,8 @@ export async function sendEmail(transport: Transporter, email: OutgoingEmail): P
     inline.push({ filename: img.filename, content: img.content, contentType: img.contentType, cid: img.cid });
   }
   html = html.replace(/<img(?![^>]*style=)/g, '<img style="max-width:100%;height:auto"');
-  const attachments = [...inline, ...(isFollowup ? [] : (email.files?.attachments ?? []))];
+  const withFiles = !isFollowup || email.attachToFollowup;
+  const attachments = [...inline, ...(withFiles ? (email.files?.attachments ?? []) : [])];
 
   await transport.sendMail({
     from: { name: email.senderName || "", address: gmailUser() },

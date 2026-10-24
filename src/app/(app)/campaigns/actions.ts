@@ -32,6 +32,8 @@ export type CampaignDraft = {
   /** 0 = ไม่ส่งซ้ำ */
   followup_minutes: number;
   attachments: Attachment[];
+  /** แนบไฟล์ไปกับอีเมลส่งซ้ำด้วย */
+  followup_attach?: boolean;
 };
 
 type CampaignRow = {
@@ -41,7 +43,17 @@ type CampaignRow = {
   send_at: string;
   followup_after_minutes: number;
   attachments: Attachment[];
+  followup_attach: boolean;
 };
+
+// คอลัมน์ followup_attach มีหลังรัน SQL 006 — ก่อนหน้านั้นบันทึกโดยไม่ใส่คอลัมน์นี้
+const NEEDS_006 = "ตัวเลือก “แนบไฟล์ในอีเมลส่งซ้ำ” ยังใช้ไม่ได้ — ต้องรัน SQL ไฟล์ 006 ใน Supabase ก่อน";
+const missing006 = (err: { message: string } | null) => Boolean(err && /followup_attach/.test(err.message));
+function without006(row: CampaignRow) {
+  const { followup_attach: _drop, ...rest } = row;
+  void _drop;
+  return rest;
+}
 
 function validateDraft(d: CampaignDraft): CampaignRow | { error: string } {
   const subject = String(d.subject ?? "").trim();
@@ -67,6 +79,7 @@ function validateDraft(d: CampaignDraft): CampaignRow | { error: string } {
 
   return {
     attachments,
+    followup_attach: Boolean(d.followup_attach) && minutes > 0 && attachments.length > 0,
     subject,
     body_html: sanitizeEmailHtml(d.body_html),
     followup_body_html: minutes > 0 && !isBlankHtml(d.followup_body_html) ? sanitizeEmailHtml(d.followup_body_html) : null,
@@ -96,12 +109,13 @@ export async function createCampaignWithRecipients(
   if (missing) return { error: missing };
 
   // สร้างแบบ "หยุดไว้ก่อน" แล้วค่อยเปิดหลังใส่ผู้รับครบ กันตัวส่งหยิบไปส่งตอนรายชื่อยังไม่ครบ
-  const { data: c, error } = await db()
-    .from("campaigns")
-    .insert({ ...row, paused: true })
-    .select("id")
-    .single();
-  if (error) return { error: "บันทึกไม่สำเร็จ: " + error.message };
+  const insert = (values: object) => db().from("campaigns").insert({ ...values, paused: true }).select("id").single();
+  let { data: c, error } = await insert(row);
+  if (missing006(error)) {
+    if (row.followup_attach) return { error: NEEDS_006 };
+    ({ data: c, error } = await insert(without006(row)));
+  }
+  if (error || !c) return { error: "บันทึกไม่สำเร็จ: " + (error?.message ?? "") };
 
   const { error: e2 } = await db()
     .from("recipients")
@@ -124,7 +138,11 @@ export async function updateCampaign(id: string, draft: CampaignDraft): Promise<
   if (missing) return { error: missing };
 
   const { data: old } = await db().from("campaigns").select("attachments,body_html,followup_body_html").eq("id", id).single();
-  const { error } = await db().from("campaigns").update(row).eq("id", id);
+  let { error } = await db().from("campaigns").update(row).eq("id", id);
+  if (missing006(error)) {
+    if (row.followup_attach) return { error: NEEDS_006 };
+    ({ error } = await db().from("campaigns").update(without006(row)).eq("id", id));
+  }
   if (error) return { error: "บันทึกไม่สำเร็จ: " + error.message };
 
   // ลบไฟล์แนบ/รูปที่ถูกเอาออกจากข้อความแล้ว
@@ -267,11 +285,12 @@ type TestContent = {
   followup_body_html: string | null;
   followup_after_minutes: number;
   attachments: Attachment[];
+  followup_attach?: boolean;
 };
 
 async function sendTestCore(c: TestContent, campaignId: string | null): Promise<FormState> {
   const [{ data: s, error: e1 }, { data: used, error: e2 }] = await Promise.all([
-    db().from("settings").select("sender_name,daily_limit").eq("id", 1).single(),
+    db().from("settings").select("*").eq("id", 1).single(),
     db().rpc("sent_last_24h"),
   ]);
   if (e1 || e2) return { error: "อ่านข้อมูลไม่ได้: " + (e1 ?? e2)!.message };
@@ -291,9 +310,12 @@ async function sendTestCore(c: TestContent, campaignId: string | null): Promise<
   }
 
   try {
-    const files = await loadMailFiles(c.attachments ?? [], [c.body_html, c.followup_body_html]);
+    const signatureHtml: string = s.signature_html ?? "";
+    const files = await loadMailFiles(c.attachments ?? [], [c.body_html, c.followup_body_html, signatureHtml]);
     const base = {
       files,
+      signatureHtml,
+      attachToFollowup: Boolean(c.followup_attach),
       toName: "ทดสอบ",
       toEmail: me,
       subject: `[ทดสอบ] ${c.subject}`,
@@ -328,7 +350,7 @@ export async function sendTestEmail(campaignId: string): Promise<FormState> {
   if (!isUuid(campaignId)) return { error: "ไม่พบข้อความนี้" };
   const { data: c, error } = await db()
     .from("campaigns")
-    .select("subject,body_html,followup_body_html,followup_after_minutes,attachments")
+    .select("*")
     .eq("id", campaignId)
     .single();
   if (error) return { error: "อ่านข้อความไม่ได้: " + error.message };
