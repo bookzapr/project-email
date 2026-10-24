@@ -60,14 +60,17 @@ page.setDefaultTimeout(15_000);
 let secret = null;
 let recovery = [];
 
+/** ล็อกอินแบบคนจริง: ใส่รหัสผ่าน → (ถ้าเปิด 2FA) ช่องรหัส 6 หลักเด้งขึ้น → ใส่รหัส */
 async function login(code) {
   await page.goto(`${BASE}/login`);
+  await page.waitForLoadState("networkidle");
   await page.fill("#password", PASSWORD);
-  if (code !== undefined) {
-    if (!(await page.locator("#code").count())) await page.click("button[type=submit]");
-    await page.locator("#code").fill(code);
-  }
   await page.click("button[type=submit]");
+  if (code !== undefined) {
+    await page.locator("#code").waitFor();
+    await page.locator("#code").fill(code);
+    await page.click("button[type=submit]");
+  }
 }
 
 try {
@@ -117,7 +120,7 @@ try {
       secret = (await page.locator("li code").first().innerText()).replace(/\s/g, "");
       await page.getByLabel("รหัส 6 หลัก").fill(totp(secret));
       await page.getByRole("button", { name: "ยืนยันและเปิดใช้" }).click();
-      await page.getByText(/รหัสสำรอง/).first().waitFor();
+      await page.locator("ul.font-mono li").first().waitFor();
       recovery = await page.locator("ul.font-mono li").allInnerTexts();
       assert(recovery.length === 8, `ได้ ${recovery.length} ชุด`);
       const { data } = await db.from("settings").select("totp_enabled,totp_secret_enc").eq("id", 1).single();
@@ -127,8 +130,9 @@ try {
     });
     await check("ล็อกอินด้วยรหัสผ่านอย่างเดียว / รหัส 2FA ผิด → เข้าไม่ได้", async () => {
       await ctx.clearCookies();
-      await page.goto(`${BASE}/login`);
-      await page.locator("#code").waitFor();
+      await login();
+      await page.getByText("กรุณาใส่รหัส 6 หลัก").waitFor();
+      assert(page.url().includes("/login"), "เข้าไปได้ทั้งที่ไม่มีรหัส 2FA!");
       await login("000000");
       await page.getByText("รหัสยืนยันไม่ถูกต้อง").waitFor();
       assert(page.url().includes("/login"), "เข้าไปได้!");
@@ -147,7 +151,7 @@ try {
       await page.getByText("รหัสยืนยันไม่ถูกต้อง").waitFor();
     });
     await check("บันทึกการใช้งานแสดงการเปิด 2FA / ล็อกอิน / ใส่รหัสผิด", async () => {
-      await login(totp(secret, 2));
+      await login(recovery[2]); // รหัส TOTP ช่วงถัดๆ ไปอยู่นอกหน้าต่าง ±1 จึงใช้รหัสสำรองแทน
       await page.getByRole("heading", { name: "ข้อความทั้งหมด" }).waitFor();
       await page.goto(`${BASE}/settings`);
       for (const t of ["เปิดยืนยันตัวตน 2 ขั้น", "ล็อกอินสำเร็จ", "ใส่รหัสผิด", "ใช้รหัสสำรองล็อกอิน"]) {
@@ -166,11 +170,12 @@ try {
       await db.from("login_failures").delete().gte("id", 0);
       for (let i = 0; i < 5; i++) {
         await page.goto(`${BASE}/login`);
+        await page.waitForLoadState("networkidle");
         await page.fill("#password", "wrong-" + i);
         await page.click("button[type=submit]");
         await page.locator(".alert-error").waitFor();
       }
-      await login(totp(secret, 3));
+      await login();
       await page.getByText(/หลายครั้งเกินไป/).waitFor();
       await db.from("login_failures").delete().gte("id", 0); // ปลดล็อก
     });
@@ -203,7 +208,7 @@ try {
       }
     });
     await check("ปิด 2FA (ต้องใส่รหัส) → กลับเป็นปกติ", async () => {
-      await login(totp(secret, 4));
+      await login(recovery[3]);
       await page.getByRole("heading", { name: "ข้อความทั้งหมด" }).waitFor();
       await page.goto(`${BASE}/settings`);
       await page.getByLabel("รหัสยืนยันเพื่อปิด 2FA").fill(recovery[1]);
