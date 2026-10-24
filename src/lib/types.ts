@@ -79,7 +79,12 @@ export type Settings = {
   last_imap_error: string | null;
   /** ลายเซ็นท้ายอีเมล (มีหลังรัน SQL 006 — ก่อนหน้านั้นเป็น undefined) */
   signature_html?: string;
+  /** ความปลอดภัย (มีหลังรัน SQL 008) */
+  session_version?: number;
+  totp_enabled?: boolean;
+  alert_email?: string;
+  retention_days?: number;
 };
 
 /** ผลลัพธ์ที่ Server Action ส่งกลับไปให้ฟอร์มแสดง */
-export type FormState = { ok?: boolean; error?: string; message?: string } | null;
+export type FormState = { ok?: boolean; error?: string; message?: string; needCode?: boolean } | null;

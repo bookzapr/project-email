@@ -10,11 +10,15 @@ export function SettingsForm(props: {
   dailyLimit: number;
   /** null = ยังไม่ได้รัน SQL 006 (ยังตั้งลายเซ็นไม่ได้) */
   signatureHtml: string | null;
+  /** null = ยังไม่ได้รัน SQL 008 */
+  security: { alertEmail: string; retentionDays: number } | null;
 }) {
   const [state, action, pending] = useActionState(saveSettings, null);
   const [senderName, setSenderName] = useState(props.senderName);
   const [dailyLimit, setDailyLimit] = useState(String(props.dailyLimit));
   const [signature, setSignature] = useState(props.signatureHtml ?? "");
+  const [alertEmail, setAlertEmail] = useState(props.security?.alertEmail ?? "");
+  const [retention, setRetention] = useState(String(props.security?.retentionDays ?? 0));
 
   return (
     <form action={action} className="card space-y-4">
@@ -79,6 +83,45 @@ export function SettingsForm(props: {
           </>
         )}
       </div>
+
+      {props.security && (
+        <div className="grid gap-4 border-t border-emerald-100 pt-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="alert_email" className="label">
+              🔔 อีเมลรับแจ้งเตือนความปลอดภัย
+            </label>
+            <input
+              id="alert_email"
+              name="alert_email"
+              type="email"
+              value={alertEmail}
+              onChange={(e) => setAlertEmail(e.target.value)}
+              className="input"
+              placeholder={`ว่าง = ${props.senderEmail}`}
+            />
+            <p className="hint">แจ้งทุกครั้งที่มีการล็อกอิน และเมื่อมีคนพยายามเดารหัสผ่าน</p>
+          </div>
+          <div>
+            <label htmlFor="retention_days" className="label">
+              🧹 ลบข้อมูลเก่าอัตโนมัติ (PDPA)
+            </label>
+            <select
+              id="retention_days"
+              name="retention_days"
+              value={retention}
+              onChange={(e) => setRetention(e.target.value)}
+              className="input"
+            >
+              <option value="0">ไม่ลบ (เก็บไว้ตลอด)</option>
+              <option value="30">ลบข้อความที่ส่งเกิน 30 วัน</option>
+              <option value="90">ลบข้อความที่ส่งเกิน 90 วัน</option>
+              <option value="180">ลบข้อความที่ส่งเกิน 180 วัน</option>
+              <option value="365">ลบข้อความที่ส่งเกิน 1 ปี</option>
+            </select>
+            <p className="hint">ลบทั้งข้อความ รายชื่อผู้รับ และไฟล์แนบ วันละครั้ง — ลบแล้วกู้คืนไม่ได้</p>
+          </div>
+        </div>
+      )}
 
       {state?.error && <p className="alert-error">{state.error}</p>}
       {state?.message && <p className="alert-ok">{state.message}</p>}

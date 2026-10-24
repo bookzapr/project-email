@@ -1,5 +1,6 @@
 // ดาวน์โหลดรายชื่อผู้รับเป็นไฟล์ที่เปิดใน Excel ได้ (CSV UTF-8 + BOM ภาษาไทยไม่เพี้ยน)
 // /campaigns/<id>/export?filter=waiting  (all | waiting | replied | problem | pending | stopped)
+import { audit } from "@/lib/audit";
 import { isLoggedIn } from "@/lib/auth";
 import { isUuid } from "@/lib/data";
 import { db } from "@/lib/db";
@@ -59,6 +60,7 @@ export async function GET(request: Request, ctx: RouteContext<"/campaigns/[id]/e
       .join(","),
   );
   const csv = "﻿" + [header.join(","), ...lines].join("\r\n");
+  await audit("export_downloaded", { subject: c.subject, filter: filterKey, count: list.length });
 
   const base = `${c.subject.replace(/\{\s*ชื่อ\s*\}/g, "").replace(/[\\/:*?"<>|]/g, "").trim().slice(0, 60)} - ${filter.label}`;
   return new Response(csv, {

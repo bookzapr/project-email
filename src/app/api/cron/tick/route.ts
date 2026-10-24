@@ -7,6 +7,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { checkReplies, type ReplyCheckResult } from "@/lib/replies";
 import { db } from "@/lib/db";
+import { applyRetention } from "@/lib/retention";
 import { runSendRound } from "@/lib/sender";
 import { cleanupOrphanFiles } from "@/lib/storage";
 
@@ -44,13 +45,20 @@ async function handle(request: Request) {
       includeFollowup: replies !== null && replies.skipped !== "locked",
     });
     // วันละครั้ง: ลบไฟล์แนบ/รูปที่ค้าง (ล็อกไว้ 24 ชม. และไม่ปลดล็อก = ทำอีกครั้งพรุ่งนี้)
-    let cleanup: { removed: number } | null = null;
+    let cleanup: { removed: number; retention?: { campaigns: number } } | null = null;
     const { data: cleanupToken } = await db().rpc("try_job_lock", { p_name: "cleanup", p_seconds: 24 * 60 * 60 });
     if (cleanupToken) {
-      cleanup = await cleanupOrphanFiles().catch((err) => {
-        console.error("[cron] ลบไฟล์ค้างไม่สำเร็จ:", err);
-        return null;
+      // ลบข้อมูลเก่าก่อน แล้วค่อยลบไฟล์ที่ไม่มีข้อความไหนใช้แล้ว
+      const retention = await applyRetention().catch((err) => {
+        console.error("[cron] ลบข้อมูลเก่าไม่สำเร็จ:", err);
+        return undefined;
       });
+      cleanup = await cleanupOrphanFiles()
+        .then((r) => ({ ...r, retention }))
+        .catch((err) => {
+          console.error("[cron] ลบไฟล์ค้างไม่สำเร็จ:", err);
+          return null;
+        });
     }
 
     return Response.json({ ok: true, replies, replyError, ...sent, cleanup });

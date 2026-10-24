@@ -2,6 +2,7 @@
 
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
+import { audit } from "@/lib/audit";
 import { requireAuth } from "@/lib/auth";
 import { isUuid } from "@/lib/data";
 import { db } from "@/lib/db";
@@ -147,6 +148,7 @@ export async function createCampaignWithRecipients(
   }
   await db().from("campaigns").update({ paused: false }).eq("id", c.id);
 
+  await audit("campaign_created", { subject: row.subject, count: people.length, cc: row.cc_emails.length });
   redirect(`/campaigns/${c.id}?created=1`);
 }
 
@@ -175,13 +177,18 @@ export async function updateCampaign(id: string, draft: CampaignDraft): Promise<
       imagePathsInAll([old.body_html, old.followup_body_html]).filter((p) => !keepImg.has(p)),
     ).catch(() => {});
   }
+  await audit("campaign_updated", { subject: row.subject });
   redirect(`/campaigns/${id}`);
 }
 
 export async function deleteCampaign(id: string): Promise<void> {
   await requireAuth();
   if (!isUuid(id)) return;
-  const { data: c } = await db().from("campaigns").select("attachments,body_html,followup_body_html").eq("id", id).single();
+  const { data: c } = await db()
+    .from("campaigns")
+    .select("subject,attachments,body_html,followup_body_html")
+    .eq("id", id)
+    .single();
   const { error } = await db().from("campaigns").delete().eq("id", id);
   if (error) throw new Error("ลบไม่สำเร็จ: " + error.message);
   if (c) {
@@ -190,6 +197,7 @@ export async function deleteCampaign(id: string): Promise<void> {
       imagePathsInAll([c.body_html, c.followup_body_html]),
     ).catch(() => {});
   }
+  await audit("campaign_deleted", { subject: c?.subject ?? id });
   redirect("/");
 }
 
@@ -215,6 +223,7 @@ export async function setCampaignPaused(id: string, paused: boolean): Promise<Fo
   if (!isUuid(id)) return { error: "ไม่พบข้อความนี้" };
   const { error } = await db().from("campaigns").update({ paused }).eq("id", id);
   if (error) return { error: "บันทึกไม่สำเร็จ: " + error.message };
+  await audit("campaign_paused", { campaign: id, paused });
   refresh();
   return { ok: true };
 }
@@ -244,6 +253,7 @@ export async function addRecipients(campaignId: string, recipients: ParsedRecipi
 
   refresh();
   const skipped = people.length - fresh.length;
+  await audit("recipients_added", { campaign: campaignId, count: fresh.length });
   return { ok: true, message: `เพิ่มผู้รับ ${fresh.length} คนแล้ว${skipped ? ` (ข้าม ${skipped} คนที่มีอยู่แล้ว)` : ""}` };
 }
 
@@ -290,6 +300,7 @@ export type RecipientAction = "stop" | "resume" | "retry" | "delete";
 export async function recipientAction(id: string, action: RecipientAction): Promise<FormState> {
   await requireAuth();
   if (!isUuid(id)) return { error: "ไม่พบผู้รับนี้" };
+  await audit("recipient_changed", { recipient: id, action });
 
   if (action === "delete") {
     const { error } = await db().from("recipients").delete().eq("id", id);
@@ -412,7 +423,9 @@ export async function sendTestEmail(campaignId: string): Promise<FormState> {
     .eq("id", campaignId)
     .single();
   if (error) return { error: "อ่านข้อความไม่ได้: " + error.message };
-  return sendTestCore(c, campaignId);
+  const res = await sendTestCore(c, campaignId);
+  if (res?.ok) await audit("test_sent", { subject: c.subject });
+  return res;
 }
 
 /** ทดสอบจากฉบับร่างในขั้นตอนสร้างข้อความ (ยังไม่บันทึก) */
@@ -420,5 +433,7 @@ export async function sendTestDraft(draft: CampaignDraft): Promise<FormState> {
   await requireAuth();
   const row = validateDraft({ ...draft, send_now: true });
   if ("error" in row) return { error: row.error };
-  return sendTestCore(row, null);
+  const res = await sendTestCore(row, null);
+  if (res?.ok) await audit("test_sent", { subject: row.subject });
+  return res;
 }

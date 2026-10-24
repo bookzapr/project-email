@@ -1,7 +1,9 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { audit } from "@/lib/audit";
 import { requireAuth } from "@/lib/auth";
+import { isValidEmail } from "@/lib/parse-recipients";
 import { db } from "@/lib/db";
 import { sanitizeEmailHtml } from "@/lib/sanitize";
 import { isBlankHtml } from "@/lib/template";
@@ -37,6 +39,23 @@ export async function saveSettings(_prev: FormState, formData: FormData): Promis
     }
   }
 
+  // ความปลอดภัย + ระยะเวลาเก็บข้อมูล (คอลัมน์มีหลังรัน SQL 008)
+  if (formData.has("retention_days")) {
+    const alertEmail = String(formData.get("alert_email") ?? "").trim().toLowerCase();
+    const retention = Number(formData.get("retention_days"));
+    if (alertEmail && !isValidEmail(alertEmail)) return { error: "อีเมลรับแจ้งเตือนไม่ถูกต้อง" };
+    if (!Number.isInteger(retention) || retention < 0 || retention > 3650) return { error: "ระยะเวลาเก็บข้อมูลไม่ถูกต้อง" };
+    const { error: e3 } = await db()
+      .from("settings")
+      .update({ alert_email: alertEmail, retention_days: retention })
+      .eq("id", 1);
+    if (e3) {
+      refresh();
+      return { error: "บันทึกส่วนอื่นแล้ว แต่ส่วนความปลอดภัยยังใช้ไม่ได้ — ต้องรัน SQL ไฟล์ 008 ใน Supabase ก่อน" };
+    }
+  }
+
+  await audit("settings_changed", { sender_name: senderName, daily_limit: dailyLimit });
   refresh();
   return { ok: true, message: "บันทึกการตั้งค่าแล้ว" };
 }

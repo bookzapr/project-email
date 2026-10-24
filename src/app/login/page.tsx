@@ -1,5 +1,15 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
+import { Suspense } from "react";
+import { db } from "@/lib/db";
 import { LoginForm } from "./login-form";
+
+/** แสดงช่องรหัส 6 หลักเฉพาะเมื่อเปิดใช้ 2FA แล้ว */
+async function LoginWithSettings() {
+  await connection();
+  const { data } = await db().from("settings").select("*").eq("id", 1).single();
+  return <LoginForm twoFactor={Boolean(data?.totp_enabled)} />;
+}
 
 export const metadata: Metadata = { title: "เข้าสู่ระบบ" };
 
@@ -15,7 +25,9 @@ export default function LoginPage() {
         </div>
         <h1 className="mt-4 text-center text-2xl font-bold text-emerald-950">ระบบส่งอีเมลอัตโนมัติ</h1>
         <p className="mt-1 text-center text-sm text-slate-500">ส่งเอง · ตรวจเอง · ทวงเอง</p>
-        <LoginForm />
+        <Suspense fallback={<LoginForm twoFactor={false} />}>
+          <LoginWithSettings />
+        </Suspense>
       </div>
     </main>
   );
