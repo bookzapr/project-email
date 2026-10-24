@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useTransition } from "react";
+import type { FormState } from "@/lib/types";
 import { RichTextEditor } from "@/components/rich-text-editor";
-import { saveSettings } from "./actions";
+import { saveSettings, sendDigestNow } from "./actions";
 
 export function SettingsForm(props: {
   senderEmail: string;
@@ -12,6 +13,8 @@ export function SettingsForm(props: {
   signatureHtml: string | null;
   /** null = ยังไม่ได้รัน SQL 008 */
   security: { alertEmail: string; retentionDays: number } | null;
+  /** null = ยังไม่ได้รัน SQL 009 */
+  digestHour: number | null;
 }) {
   const [state, action, pending] = useActionState(saveSettings, null);
   const [senderName, setSenderName] = useState(props.senderName);
@@ -19,6 +22,9 @@ export function SettingsForm(props: {
   const [signature, setSignature] = useState(props.signatureHtml ?? "");
   const [alertEmail, setAlertEmail] = useState(props.security?.alertEmail ?? "");
   const [retention, setRetention] = useState(String(props.security?.retentionDays ?? 0));
+  const [digestHour, setDigestHour] = useState(String(props.digestHour ?? 17));
+  const [digestState, setDigestState] = useState<FormState>(null);
+  const [digestPending, startDigest] = useTransition();
 
   return (
     <form action={action} className="card space-y-4">
@@ -122,6 +128,55 @@ export function SettingsForm(props: {
           </div>
         </div>
       )}
+
+      <div className="border-t border-emerald-100 pt-4">
+        <label htmlFor="digest_hour" className="label">
+          📊 อีเมลสรุปประจำวัน (ใครส่งงานแล้ว / ใครยังไม่ส่ง)
+        </label>
+        {props.digestHour === null ? (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            ยังใช้ไม่ได้ — ต้องรัน SQL ไฟล์ <code>supabase/migrations/009_digest.sql</code> ใน Supabase ก่อน
+          </p>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                id="digest_hour"
+                name="digest_hour"
+                value={digestHour}
+                onChange={(e) => setDigestHour(e.target.value)}
+                className="input w-auto"
+              >
+                <option value="-1">ปิด (ไม่ส่งสรุป)</option>
+                {Array.from({ length: 15 }, (_, i) => i + 7).map((h) => (
+                  <option key={h} value={h}>
+                    ส่งทุกวัน {String(h).padStart(2, "0")}:00 น.
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btn"
+                disabled={digestPending}
+                onClick={() =>
+                  startDigest(async () => {
+                    setDigestState(null);
+                    setDigestState(await sendDigestNow());
+                  })
+                }
+              >
+                {digestPending ? "กำลังส่ง..." : "📨 ส่งสรุปตัวอย่างตอนนี้"}
+              </button>
+            </div>
+            <p className="hint">
+              ส่งไปที่อีเมลรับแจ้งเตือนด้านบน (ว่าง = {props.senderEmail}) · แยกตามข้อความ: ใครส่งงานวันนี้ ใครยังไม่ส่ง
+              ใครมีปัญหา · วันไหนไม่มีอะไรค้างจะไม่ส่ง
+            </p>
+            {digestState?.error && <p className="alert-error mt-2">{digestState.error}</p>}
+            {digestState?.message && <p className="alert-ok mt-2">{digestState.message}</p>}
+          </>
+        )}
+      </div>
 
       {state?.error && <p className="alert-error">{state.error}</p>}
       {state?.message && <p className="alert-ok">{state.message}</p>}

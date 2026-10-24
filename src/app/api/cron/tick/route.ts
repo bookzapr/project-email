@@ -7,6 +7,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { checkReplies, type ReplyCheckResult } from "@/lib/replies";
 import { db } from "@/lib/db";
+import { maybeSendDailyDigest } from "@/lib/digest";
 import { applyRetention } from "@/lib/retention";
 import { runSendRound } from "@/lib/sender";
 import { cleanupOrphanFiles } from "@/lib/storage";
@@ -44,6 +45,11 @@ async function handle(request: Request) {
       // ถ้ารอบนี้ตรวจกล่องจดหมายไม่ได้ หรือมีรอบอื่นกำลังตรวจอยู่ ให้เลื่อนอีเมลส่งซ้ำไปรอบหน้า
       includeFollowup: replies !== null && replies.skipped !== "locked",
     });
+    // สรุปประจำวันถึงเจ้าของ (ส่งเมื่อถึงเวลาที่ตั้ง วันละครั้ง)
+    const digest = await maybeSendDailyDigest().catch((err) => {
+      console.error("[cron] ส่งสรุปประจำวันไม่สำเร็จ:", err);
+      return "ผิดพลาด: " + (err as Error).message;
+    });
     // วันละครั้ง: ลบไฟล์แนบ/รูปที่ค้าง (ล็อกไว้ 24 ชม. และไม่ปลดล็อก = ทำอีกครั้งพรุ่งนี้)
     let cleanup: { removed: number; retention?: { campaigns: number } } | null = null;
     const { data: cleanupToken } = await db().rpc("try_job_lock", { p_name: "cleanup", p_seconds: 24 * 60 * 60 });
@@ -61,7 +67,7 @@ async function handle(request: Request) {
         });
     }
 
-    return Response.json({ ok: true, replies, replyError, ...sent, cleanup });
+    return Response.json({ ok: true, replies, replyError, ...sent, digest, cleanup });
   } catch (err) {
     console.error("[cron] รอบนี้ผิดพลาด:", err);
     return Response.json({ ok: false, replies, replyError, error: (err as Error).message }, { status: 500 });

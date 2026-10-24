@@ -41,6 +41,7 @@ async function Settings() {
         dailyLimit={s.daily_limit}
         signatureHtml={s.signature_html ?? null}
         security={has008 ? { alertEmail: s.alert_email ?? "", retentionDays: s.retention_days ?? 0 } : null}
+        digestHour={s.digest_hour ?? null}
       />
 
       <section className="card space-y-4">

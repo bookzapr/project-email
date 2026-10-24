@@ -5,6 +5,8 @@ import { audit } from "@/lib/audit";
 import { requireAuth } from "@/lib/auth";
 import { isValidEmail } from "@/lib/parse-recipients";
 import { db } from "@/lib/db";
+import { sendDigest } from "@/lib/digest";
+import { classifySendError } from "@/lib/mailer";
 import { sanitizeEmailHtml } from "@/lib/sanitize";
 import { isBlankHtml } from "@/lib/template";
 import type { FormState } from "@/lib/types";
@@ -55,7 +57,31 @@ export async function saveSettings(_prev: FormState, formData: FormData): Promis
     }
   }
 
+  // สรุปประจำวัน (คอลัมน์มีหลังรัน SQL 009)
+  if (formData.has("digest_hour")) {
+    const hour = Number(formData.get("digest_hour"));
+    if (!Number.isInteger(hour) || hour < -1 || hour > 23) return { error: "เวลาส่งสรุปไม่ถูกต้อง" };
+    const { error: e4 } = await db().from("settings").update({ digest_hour: hour }).eq("id", 1);
+    if (e4) {
+      refresh();
+      return { error: "บันทึกส่วนอื่นแล้ว แต่สรุปประจำวันยังใช้ไม่ได้ — ต้องรัน SQL ไฟล์ 009 ใน Supabase ก่อน" };
+    }
+  }
+
   await audit("settings_changed", { sender_name: senderName, daily_limit: dailyLimit });
   refresh();
   return { ok: true, message: "บันทึกการตั้งค่าแล้ว" };
+}
+
+/** ปุ่ม "ส่งสรุปตัวอย่างตอนนี้" — ส่งทันทีโดยไม่สนเวลาที่ตั้ง */
+export async function sendDigestNow(): Promise<FormState> {
+  await requireAuth();
+  try {
+    const res = await sendDigest();
+    if (!res) return { ok: true, message: "ตอนนี้ไม่มีข้อความที่รอส่งงาน — ไม่มีอะไรให้สรุป (วันแบบนี้ระบบจะไม่ส่งสรุป)" };
+    await audit("digest_sent", { campaigns: res.campaigns, auto: false });
+    return { ok: true, message: `ส่งสรุปแล้วไปที่ ${res.to} (${res.campaigns} ข้อความ) ลองเปิดดูใน Gmail ได้เลย` };
+  } catch (err) {
+    return { error: classifySendError(err).message };
+  }
 }

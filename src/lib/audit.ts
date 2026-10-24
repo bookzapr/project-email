@@ -19,6 +19,7 @@ export type AuditAction =
   | "recipient_changed"
   | "export_downloaded"
   | "backup_downloaded"
+  | "digest_sent"
   | "test_sent"
   | "settings_changed"
   | "data_retention_cleanup";
@@ -40,6 +41,7 @@ export const AUDIT_LABEL: Record<AuditAction, string> = {
   recipient_changed: "👤 เปลี่ยนสถานะ/ลบผู้รับ",
   export_downloaded: "⬇ ดาวน์โหลดรายชื่อ",
   backup_downloaded: "💾 ดาวน์โหลดข้อมูลสำรอง",
+  digest_sent: "📊 ส่งอีเมลสรุปประจำวัน",
   test_sent: "🧪 ทดสอบส่งหาตัวเอง",
   settings_changed: "⚙️ เปลี่ยนการตั้งค่า",
   data_retention_cleanup: "🧹 ลบข้อมูลเก่าอัตโนมัติ",

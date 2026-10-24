@@ -87,6 +87,8 @@ export type Settings = {
   totp_enabled?: boolean;
   alert_email?: string;
   retention_days?: number;
+  /** สรุปประจำวัน (มีหลังรัน SQL 009): ชั่วโมงที่ส่ง เวลาไทย, -1 = ปิด */
+  digest_hour?: number;
 };
 
 /** ผลลัพธ์ที่ Server Action ส่งกลับไปให้ฟอร์มแสดง */
