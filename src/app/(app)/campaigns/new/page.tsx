@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "ส่งอีเมลใหม่
 export default function NewCampaignPage() {
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">ส่งอีเมลใหม่</h1>
+      <h1 className="page-title">ส่งอีเมลใหม่</h1>
       <Suspense fallback={<FormSkeleton />}>
         <NewForm />
       </Suspense>

@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "./db";
 import type { Attachment } from "./attachments";
-import { classifySendError, createTransport, sendEmail } from "./mailer";
+import { classifySendError, createTransport, mergeCc, sendEmail } from "./mailer";
 import { loadMailFiles, type MailFiles } from "./storage";
 
 // ตัวส่งอีเมล 1 รอบ — ถูกเรียกจากตัวตั้งเวลาผ่าน /api/cron/tick ทุก 1–2 นาที
@@ -65,7 +65,7 @@ export async function runSendRound(opts: {
 
   // ไฟล์แนบ/รูป: โหลดครั้งเดียวต่อข้อความ ใช้ซ้ำกับทุกผู้รับในรอบนี้
   const signatureHtml: string = settings.signature_html ?? "";
-  const filesCache = new Map<string, Promise<{ files: MailFiles; attachToFollowup: boolean }>>();
+  const filesCache = new Map<string, Promise<{ files: MailFiles; attachToFollowup: boolean; cc: string[] }>>();
   const filesFor = (row: ClaimedRow) => {
     if (!filesCache.has(row.campaign_id)) {
       filesCache.set(
@@ -77,7 +77,7 @@ export async function runSendRound(opts: {
             row.followup_body_html,
             signatureHtml,
           ]);
-          return { files, attachToFollowup: Boolean(data?.followup_attach) };
+          return { files, attachToFollowup: Boolean(data?.followup_attach), cc: (data?.cc_emails ?? []) as string[] };
         })(),
       );
     }
@@ -98,7 +98,7 @@ export async function runSendRound(opts: {
       // ระหว่างรอคิว สถานะเปลี่ยนไปหรือยัง (กด "หยุด" / ส่งงานกลับมาแล้ว / ถูกลบ)
       const { data: current } = await db()
         .from("recipients")
-        .select("status")
+        .select("*")
         .eq("id", row.recipient_id)
         .eq("lock_token", token)
         .maybeSingle();
@@ -110,8 +110,10 @@ export async function runSendRound(opts: {
       }
 
       try {
-        const { files, attachToFollowup } = await filesFor(row);
+        const { files, attachToFollowup, cc: campaignCc } = await filesFor(row);
+        const cc = mergeCc(row.email, campaignCc, current.cc_emails as string[] | undefined);
         const messageId = await sendEmail(transport, {
+          cc,
           kind: row.kind,
           toName: row.name,
           toEmail: row.email,
@@ -124,7 +126,8 @@ export async function runSendRound(opts: {
           attachToFollowup,
           signatureHtml,
         });
-        await complete(row, token, { p_success: true, p_message_id: messageId });
+        // Gmail นับโควตาตามจำนวนที่อยู่อีเมล (ถึง + CC)
+        await complete(row, token, { p_success: true, p_message_id: messageId, p_address_count: 1 + cc.length });
         result.sent++;
       } catch (err) {
         const { kind, message } = classifySendError(err);
@@ -173,7 +176,14 @@ export async function runSendRound(opts: {
 async function complete(
   row: ClaimedRow,
   token: string,
-  fields: { p_success: boolean; p_message_id?: string; p_error?: string; p_retry_at?: string; p_give_up?: boolean },
+  fields: {
+    p_success: boolean;
+    p_message_id?: string;
+    p_error?: string;
+    p_retry_at?: string;
+    p_give_up?: boolean;
+    p_address_count?: number;
+  },
 ) {
   // ส่งไปแล้วแต่บันทึกไม่ได้ = เสี่ยงส่งซ้ำเมื่อการจองหมดอายุ จึงลองบันทึกซ้ำก่อนยอมแพ้
   let lastError = "";

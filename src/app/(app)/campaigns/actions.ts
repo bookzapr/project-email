@@ -7,7 +7,7 @@ import { isUuid } from "@/lib/data";
 import { db } from "@/lib/db";
 import { fromBangkokInput } from "@/lib/format";
 import { classifySendError, createTransport, gmailUser, sendEmail } from "@/lib/mailer";
-import { parseRecipients, type ParsedRecipient } from "@/lib/parse-recipients";
+import { isValidEmail, parseRecipients, splitEmails, type ParsedRecipient } from "@/lib/parse-recipients";
 import { sanitizeEmailHtml } from "@/lib/sanitize";
 import { type Attachment, checkAttachment, checkImage } from "@/lib/attachments";
 import { createUploadLink, deleteFiles, imagePathsInAll, loadMailFiles, verifyAttachments } from "@/lib/storage";
@@ -34,9 +34,12 @@ export type CampaignDraft = {
   attachments: Attachment[];
   /** แนบไฟล์ไปกับอีเมลส่งซ้ำด้วย */
   followup_attach?: boolean;
+  /** CC ทุกฉบับ */
+  cc_emails?: string[];
 };
 
 type CampaignRow = {
+  cc_emails: string[];
   subject: string;
   body_html: string;
   followup_body_html: string | null;
@@ -69,6 +72,11 @@ function validateDraft(d: CampaignDraft): CampaignRow | { error: string } {
     return { error: "ระยะเวลาส่งซ้ำไม่ถูกต้อง" };
   }
 
+  const cc = splitEmails((d.cc_emails ?? []).join(" "));
+  const badCc = cc.find((e) => !isValidEmail(e));
+  if (badCc) return { error: `อีเมล CC ไม่ถูกต้อง: ${badCc}` };
+  if (cc.length > 10) return { error: "CC ได้ไม่เกิน 10 อีเมล" };
+
   const attachments: Attachment[] = [];
   for (const a of Array.isArray(d.attachments) ? d.attachments : []) {
     const item = { name: String(a.name ?? ""), path: String(a.path ?? ""), size: Number(a.size) || 0, type: String(a.type ?? "") };
@@ -78,6 +86,7 @@ function validateDraft(d: CampaignDraft): CampaignRow | { error: string } {
   }
 
   return {
+    cc_emails: cc,
     attachments,
     followup_attach: Boolean(d.followup_attach) && minutes > 0 && attachments.length > 0,
     subject,
@@ -90,9 +99,21 @@ function validateDraft(d: CampaignDraft): CampaignRow | { error: string } {
 
 /** ตรวจรายชื่อฝั่ง server ซ้ำอีกรอบ (ไม่เชื่อข้อมูลจาก browser) */
 function cleanRecipients(list: ParsedRecipient[]): ParsedRecipient[] {
-  const text = (list ?? []).map((r) => `"${String(r.name).replace(/"/g, '""')}",${r.email}`).join("\n");
+  const text = (list ?? [])
+    .map((r) => {
+      const cc = (r.cc ?? []).map(String).join(";");
+      return `"${String(r.name).replace(/"/g, '""')}",${String(r.email)}${cc ? `,${cc}` : ""}`;
+    })
+    .join("\n");
   return parseRecipients(text).valid;
 }
+
+const recipientRow = (campaignId: string, r: ParsedRecipient) => ({
+  campaign_id: campaignId,
+  name: r.name,
+  email: r.email,
+  cc_emails: r.cc ?? [],
+});
 
 export async function createCampaignWithRecipients(
   draft: CampaignDraft,
@@ -119,7 +140,7 @@ export async function createCampaignWithRecipients(
 
   const { error: e2 } = await db()
     .from("recipients")
-    .insert(people.map((p) => ({ campaign_id: c.id, name: p.name, email: p.email })));
+    .insert(people.map((p) => recipientRow(c.id, p)));
   if (e2) {
     await db().from("campaigns").delete().eq("id", c.id);
     return { error: "บันทึกรายชื่อผู้รับไม่สำเร็จ: " + e2.message };
@@ -218,12 +239,49 @@ export async function addRecipients(campaignId: string, recipients: ParsedRecipi
 
   const { error } = await db()
     .from("recipients")
-    .insert(fresh.map((r) => ({ campaign_id: campaignId, name: r.name, email: r.email })));
+    .insert(fresh.map((r) => recipientRow(campaignId, r)));
   if (error) return { error: "บันทึกไม่สำเร็จ: " + error.message };
 
   refresh();
   const skipped = people.length - fresh.length;
   return { ok: true, message: `เพิ่มผู้รับ ${fresh.length} คนแล้ว${skipped ? ` (ข้าม ${skipped} คนที่มีอยู่แล้ว)` : ""}` };
+}
+
+/** รายชื่อเดิมที่เคยส่ง + ข้อความเก่า (สำหรับ "เลือกจากรายชื่อเดิม") */
+export async function getAddressBook(): Promise<{
+  contacts: (ParsedRecipient & { lastUsed: string })[];
+  campaigns: { id: string; subject: string; sendAt: string; total: number }[];
+}> {
+  await requireAuth();
+  const [{ data: contacts }, { data: camps }, { data: sums }] = await Promise.all([
+    db().from("past_contacts").select("*").order("last_used", { ascending: false }).limit(5000),
+    db().from("campaigns").select("id,subject,send_at").order("send_at", { ascending: false }).limit(50),
+    db().from("campaign_summary").select("id,total"),
+  ]);
+  const totals = new Map((sums ?? []).map((s) => [s.id, s.total as number]));
+  return {
+    contacts: (contacts ?? []).map((c) => ({
+      name: c.name,
+      email: c.email,
+      cc: c.cc_emails ?? [],
+      lastUsed: c.last_used,
+    })),
+    campaigns: (camps ?? [])
+      .map((c) => ({ id: c.id, subject: c.subject, sendAt: c.send_at, total: totals.get(c.id) ?? 0 }))
+      .filter((c) => c.total > 0),
+  };
+}
+
+/** รายชื่อผู้รับทั้งหมดของข้อความเก่า (ใช้ซ้ำทั้งชุด) */
+export async function getRecipientsOf(campaignId: string): Promise<ParsedRecipient[]> {
+  await requireAuth();
+  if (!isUuid(campaignId)) return [];
+  const { data } = await db()
+    .from("recipients")
+    .select("*")
+    .eq("campaign_id", campaignId)
+    .order("created_at", { ascending: true });
+  return (data ?? []).map((r) => ({ name: r.name, email: r.email, cc: r.cc_emails ?? [] }));
 }
 
 export type RecipientAction = "stop" | "resume" | "retry" | "delete";

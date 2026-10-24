@@ -37,7 +37,7 @@ export async function getCampaignDetail(id: string): Promise<{ campaign: Campaig
     db().from("campaigns").select("*").eq("id", id).maybeSingle(),
     db()
       .from("recipients")
-      .select("id,campaign_id,name,email,status,sent_at,followup_sent_at,replied_at,reply_files,reply_url,note,error,created_at")
+      .select("*")
       .eq("campaign_id", id)
       .order("created_at", { ascending: true }),
   ]);

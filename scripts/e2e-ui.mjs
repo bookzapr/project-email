@@ -91,7 +91,8 @@ try {
     await page.getByRole("button", { name: "ถัดไป →" }).click();
     await page.getByText("กรุณาใส่หัวข้ออีเมล").waitFor();
   });
-  await check("สร้างข้อความ ขั้น ①: เขียนหัวข้อ + เนื้อหา + ใส่ชื่อผู้รับ + ตัวหนา", async () => {
+  await check("สร้างข้อความ ขั้น ①: เขียนหัวข้อ + Cc + เนื้อหา + ใส่ชื่อผู้รับ + ตัวหนา", async () => {
+    await page.fill("#cc", addr("cc-all"));
     await page.fill("#subject", "[ทดสอบ UI] เรียน คุณ{ชื่อ}");
     const editor = page.locator(".ProseMirror").first();
     await editor.click();
@@ -135,30 +136,52 @@ try {
     const preview = page.locator("div.email-content").nth(1);
     assert(await preview.locator("img").count(), "ตัวอย่างไม่มีรูป");
     await page.getByText("ไฟล์แนบ 1 ไฟล์").waitFor();
+    await page.getByText(`Cc ${addr("cc-all")}`).first().waitFor();
     await page.getByRole("button", { name: "ถัดไป →" }).click();
-    await page.getByText("วางรายชื่อทีเดียวหลายคน").waitFor();
+    await page.getByText("เพิ่มผู้รับด้วยวิธีไหน?").waitFor();
   });
   await check("สร้างข้อความ ขั้น ②: ต้องเตือนถ้ายังไม่มีผู้รับ", async () => {
     await page.getByRole("button", { name: "ถัดไป →" }).click();
     await page.getByText("กรุณาเพิ่มผู้รับอย่างน้อย 1 คน").waitFor();
   });
-  await check("สร้างข้อความ ขั้น ②: วางรายชื่อหลายคน (บรรทัดผิดต้องถูกแจ้ง)", async () => {
-    await page.fill("#paste", `ยูไอหนึ่ง, ${addr("ui1")}\nยูไอสอง\t${addr("ui2")}\nผิดรูปแบบ, abc@def`);
-    await page.getByRole("button", { name: "เพิ่มรายชื่อเหล่านี้" }).click();
-    await page.getByText("รายชื่อที่จะเพิ่ม (2 คน)").waitFor();
+  await check("สร้างข้อความ ขั้น ②: วางจาก Excel (Ctrl+V เพิ่มทันที) + CC เฉพาะคน + บรรทัดผิดถูกแจ้ง", async () => {
+    const box = page.getByLabel("วางรายชื่อ");
+    await box.click();
+    // จำลองการกด Ctrl+V จาก Excel (คั่นด้วย Tab)
+    await box.evaluate((el, text) => {
+      const dt = new DataTransfer();
+      dt.setData("text", text);
+      el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+    }, `ยูไอหนึ่ง\t${addr("ui1")}\t${addr("cc-one")}\nยูไอสอง\t${addr("ui2")}\nผิดรูปแบบ\tabc@def`);
+    await page.getByText("รายชื่อผู้รับ 2 คน").waitFor();
     await page.getByText("รูปแบบอีเมลไม่ถูกต้อง").waitFor();
+    assert(await page.getByLabel("CC แถว 1").first().inputValue() === addr("cc-one"), "CC เฉพาะคนไม่ขึ้นในตาราง");
   });
-  await check("สร้างข้อความ ขั้น ②: เพิ่มทีละคน + เอาออก + กันอีเมลซ้ำ", async () => {
+  await check("สร้างข้อความ ขั้น ②: พิมพ์เอง + แก้ในตาราง + เอาออก + กันอีเมลซ้ำ", async () => {
+    await page.getByRole("button", { name: /พิมพ์เอง/ }).click();
     await page.getByLabel("ชื่อผู้รับ").fill("ยูไอสาม");
     await page.getByLabel("อีเมลผู้รับ").fill(addr("ui3"));
     await page.getByRole("button", { name: "+ เพิ่มทีละคน" }).click();
-    await page.getByText("รายชื่อที่จะเพิ่ม (3 คน)").waitFor();
+    await page.getByText("รายชื่อผู้รับ 3 คน").waitFor();
     await page.getByLabel("ชื่อผู้รับ").fill("ซ้ำ");
     await page.getByLabel("อีเมลผู้รับ").fill(addr("ui1").toUpperCase());
     await page.getByRole("button", { name: "+ เพิ่มทีละคน" }).click();
-    await page.getByText("อีเมลนี้มีอยู่แล้ว").waitFor();
-    await page.getByRole("button", { name: "เอา ยูไอสาม ออก" }).click();
-    await page.getByText("รายชื่อที่จะเพิ่ม (2 คน)").waitFor();
+    await page.getByText("อีเมลนี้มีอยู่ในรายชื่อแล้ว").waitFor();
+    // แก้ชื่อในตาราง
+    const nameCell = page.getByLabel("ชื่อแถว 3");
+    await nameCell.fill("ยูไอสาม แก้แล้ว");
+    await nameCell.press("Enter");
+    assert(await nameCell.inputValue() === "ยูไอสาม แก้แล้ว", "แก้ชื่อในตารางไม่ได้");
+    await page.getByRole("button", { name: "เอา ยูไอสาม แก้แล้ว ออก" }).click();
+    await page.getByText("รายชื่อผู้รับ 2 คน").waitFor();
+  });
+  await check("สร้างข้อความ ขั้น ②: แท็บรายชื่อเดิม (โหลดได้ + กันซ้ำ)", async () => {
+    await page.getByRole("button", { name: /รายชื่อเดิม/ }).click();
+    await page
+      .getByText(/ใช้รายชื่อชุดเดิมทั้งหมด|ยังไม่มีรายชื่อเดิม|ค้นหาชื่อหรืออีเมล/)
+      .first()
+      .waitFor({ timeout: 15_000 })
+      .catch(async () => page.getByPlaceholder("🔍 ค้นหาชื่อหรืออีเมล").waitFor());
     await page.getByRole("button", { name: "ถัดไป →" }).click();
     await page.getByText("จะส่งเมื่อไหร่?").waitFor();
   });
@@ -213,7 +236,7 @@ try {
     await tile.waitFor();
     assert((await tile.innerText()).includes("2"), `ตัวเลขไม่ตรง: ${await tile.innerText()}`);
   });
-  await check("อีเมลที่ได้รับ: ช่อง 'ถึง' มีคนเดียว + ชื่อถูกแทนค่า + ไฟล์แนบ + รูปฝังในอีเมล", async () => {
+  await check("อีเมลที่ได้รับ: 'ถึง' คนเดียว + Cc ถูกต้อง + ชื่อถูกแทนค่า + ไฟล์แนบ + รูปฝังในอีเมล", async () => {
     const client = new ImapFlow({
       host: "imap.gmail.com",
       port: 993,
@@ -236,8 +259,11 @@ try {
           `อีเมลถึง ${addr(k)}`,
         );
         const [m] = await client.fetchAll(uids.slice(-1).join(","), { envelope: true, bodyStructure: true }, { uid: true });
-        const to = [...(m.envelope.to ?? []), ...(m.envelope.cc ?? [])].map((a) => a.address);
-        assert(to.length === 1 && to[0] === addr(k), `ช่องถึง/สำเนา: ${to.join(", ")}`);
+        const to = (m.envelope.to ?? []).map((a) => a.address);
+        assert(to.length === 1 && to[0] === addr(k), `ช่องถึง: ${to.join(", ")}`);
+        const cc = (m.envelope.cc ?? []).map((a) => a.address).sort();
+        const expectCc = (k === "ui1" ? [addr("cc-all"), addr("cc-one")] : [addr("cc-all")]).sort();
+        assert(JSON.stringify(cc) === JSON.stringify(expectCc), `Cc: ${cc.join(", ")} (ควรเป็น ${expectCc.join(", ")})`);
         assert(m.envelope.subject === `[ทดสอบ UI] เรียน คุณ${name}`, `หัวข้อ: ${m.envelope.subject}`);
         const parts = [];
         const walk = (n) => (n.childNodes ? n.childNodes.forEach(walk) : parts.push(n));
@@ -254,6 +280,18 @@ try {
       await client.logout();
     }
     return found.join(" | ");
+  });
+
+  await check("โควตานับรวม Cc (Gmail นับทุกที่อยู่อีเมล)", async () => {
+    const { data } = await db
+      .from("send_log")
+      .select("to_email,address_count,kind")
+      .eq("campaign_id", campaignId)
+      .eq("kind", "initial");
+    const byEmail = Object.fromEntries(data.map((r) => [r.to_email, r.address_count]));
+    assert(byEmail[addr("ui1")] === 3, `ui1 นับ ${byEmail[addr("ui1")]} (ควรเป็น 3 = ถึง 1 + Cc 2)`);
+    assert(byEmail[addr("ui2")] === 2, `ui2 นับ ${byEmail[addr("ui2")]} (ควรเป็น 2 = ถึง 1 + Cc 1)`);
+    return "ui1 = 3 ที่อยู่, ui2 = 2 ที่อยู่";
   });
 
   // =============================================================== หน้าสถานะ
@@ -280,6 +318,7 @@ try {
   });
   await check("เพิ่มผู้รับหลังสร้างแล้ว + ลบผู้รับ", async () => {
     await page.getByRole("button", { name: "+ เพิ่มผู้รับ" }).click();
+    await page.getByRole("button", { name: /พิมพ์เอง/ }).click();
     await page.getByLabel("ชื่อผู้รับ").fill("ยูไอสี่");
     await page.getByLabel("อีเมลผู้รับ").fill(addr("ui4"));
     await page.getByRole("button", { name: "+ เพิ่มทีละคน" }).click();

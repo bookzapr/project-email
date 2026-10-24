@@ -8,7 +8,7 @@ import type { Attachment } from "@/lib/attachments";
 import { RecipientPicker } from "@/components/recipient-picker";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { UNIT_LABEL, UNIT_MINUTES, splitMinutes, type DelayUnit } from "@/lib/format";
-import type { ParsedRecipient } from "@/lib/parse-recipients";
+import { isValidEmail, recipientProblem, splitEmails, type ParsedRecipient } from "@/lib/parse-recipients";
 import { isBlankHtml } from "@/lib/template";
 import type { FormState } from "@/lib/types";
 import type { CampaignDraft } from "@/app/(app)/campaigns/actions";
@@ -31,6 +31,7 @@ export type WizardInitial = {
   followup_minutes: number;
   attachments: Attachment[];
   followup_attach?: boolean;
+  cc_emails?: string[];
 };
 
 export function CampaignWizard({
@@ -70,6 +71,7 @@ export function CampaignWizard({
     previewTimer.current = setTimeout(() => setBody(html), 200);
   };
   const [attachments, setAttachments] = useState<Attachment[]>(initial.attachments);
+  const [ccText, setCcText] = useState((initial.cc_emails ?? []).join(", "));
   const [sampleName, setSampleName] = useState("สมชาย ใจดี");
   const [mobileTab, setMobileTab] = useState<"write" | "preview">("write");
   const [followupBody, setFollowupBody] = useState(initial.followup_body_html ?? "");
@@ -97,6 +99,7 @@ export function CampaignWizard({
     followup_minutes: followupMinutes,
     attachments,
     followup_attach: followupAttach,
+    cc_emails: splitEmails(ccText),
   });
 
   // ---- ไปขั้นถัดไป (ตรวจข้อมูลก่อน) ----
@@ -105,7 +108,19 @@ export function CampaignWizard({
       if (!subject.trim()) return "กรุณาใส่หัวข้ออีเมล";
       if (isBlankHtml(bodyRef.current)) return "กรุณาเขียนเนื้อหาอีเมล";
     }
-    if (s === "recipients" && recipients.length === 0) return "กรุณาเพิ่มผู้รับอย่างน้อย 1 คน";
+    if (s === "content") {
+      const badCc = splitEmails(ccText).find((e) => !isValidEmail(e));
+      if (badCc) return `อีเมล CC ไม่ถูกต้อง: ${badCc}`;
+    }
+    if (s === "recipients") {
+      if (recipients.length === 0) return "กรุณาเพิ่มผู้รับอย่างน้อย 1 คน";
+      const seen = new Set<string>();
+      for (const [i, r] of recipients.entries()) {
+        const problem = recipientProblem(r) ?? (seen.has(r.email.toLowerCase()) ? "อีเมลซ้ำ" : null);
+        if (problem) return `แก้รายชื่อแถวที่ ${i + 1} ก่อน (${problem})`;
+        seen.add(r.email.toLowerCase());
+      }
+    }
     return null;
   };
   const go = (target: Step) => {
@@ -151,13 +166,21 @@ export function CampaignWizard({
             <button
               type="button"
               onClick={() => go(s)}
-              className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left ${
-                s === step ? "bg-blue-600 text-white" : i < current ? "bg-blue-50 text-blue-800" : "bg-slate-100 text-slate-500"
+              className={`flex w-full items-center gap-2 rounded-2xl px-2.5 py-2.5 text-left transition ${
+                s === step
+                  ? "bg-linear-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-violet-500/30"
+                  : i < current
+                    ? "bg-white text-violet-800 ring-1 ring-violet-200 hover:bg-violet-50"
+                    : "bg-white/60 text-slate-500 ring-1 ring-indigo-100"
               }`}
             >
               <span
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                  s === step ? "bg-white text-blue-700" : i < current ? "bg-blue-600 text-white" : "bg-white text-slate-500"
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                  s === step
+                    ? "bg-white text-violet-700"
+                    : i < current
+                      ? "bg-linear-to-br from-emerald-400 to-teal-500 text-white"
+                      : "bg-indigo-100 text-indigo-400"
                 }`}
               >
                 {i < current ? "✓" : i + 1}
@@ -172,7 +195,7 @@ export function CampaignWizard({
       {step === "content" && (
         <>
           {/* มือถือ: สลับระหว่างเขียน / ดูตัวอย่าง */}
-          <div className="flex gap-1 rounded-lg bg-slate-100 p-1 text-sm lg:hidden">
+          <div className="flex gap-1 rounded-2xl bg-white/70 p-1 text-sm ring-1 ring-indigo-100 lg:hidden">
             {(["write", "preview"] as const).map((t) => (
               <button
                 key={t}
@@ -181,29 +204,62 @@ export function CampaignWizard({
                   setBody(bodyRef.current);
                   setMobileTab(t);
                 }}
-                className={`flex-1 rounded-md px-3 py-1.5 ${mobileTab === t ? "bg-white font-medium shadow-sm" : "text-slate-600"}`}
+                className={`flex-1 rounded-xl px-3 py-1.5 transition ${
+                  mobileTab === t ? "bg-linear-to-r from-indigo-600 to-violet-600 font-semibold text-white shadow" : "text-indigo-900/70"
+                }`}
               >
-                {t === "write" ? "เขียน" : "ดูตัวอย่าง"}
+                {t === "write" ? "✍️ เขียน" : "👀 ดูตัวอย่าง"}
               </button>
             ))}
           </div>
 
           <div className="grid items-start gap-4 lg:grid-cols-2">
             <div className={`card space-y-4 ${mobileTab === "write" ? "" : "hidden lg:block"}`}>
-              <div>
-                <label htmlFor="subject" className="label">
-                  หัวข้ออีเมล
-                </label>
-                <input
-                  id="subject"
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  maxLength={300}
-                  className="input"
-                  placeholder="เช่น ขอเอกสารประกอบการพิจารณา"
-                  autoFocus
-                />
+              {/* หัวอีเมลแบบ Gmail: ถึง / Cc / หัวข้อ */}
+              <div className="divide-y divide-indigo-100 overflow-hidden rounded-xl ring-1 ring-indigo-200">
+                <div className="flex items-center gap-3 bg-indigo-50/60 px-3 py-2 text-sm">
+                  <span className="w-12 shrink-0 text-indigo-900/60">ถึง</span>
+                  <span className="text-indigo-900/80">
+                    {mode === "create"
+                      ? recipients.length
+                        ? `ผู้รับ ${recipients.length} คน (ส่งแยกทีละคน)`
+                        : "ผู้รับแต่ละคน — เลือกในขั้นถัดไป"
+                      : "ผู้รับของข้อความนี้ (แยกทีละคน)"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 bg-white px-3">
+                  <label htmlFor="cc" className="w-12 shrink-0 text-sm text-indigo-900/60">
+                    Cc
+                  </label>
+                  <input
+                    id="cc"
+                    value={ccText}
+                    onChange={(e) => setCcText(e.target.value)}
+                    className="w-full min-w-0 bg-transparent py-2 text-sm focus:outline-none"
+                    placeholder="สำเนาถึงทุกฉบับ (ไม่บังคับ) เช่น boss@company.com"
+                  />
+                </div>
+                <div className="flex items-center gap-3 bg-white px-3">
+                  <label htmlFor="subject" className="w-12 shrink-0 text-sm font-semibold text-indigo-950">
+                    หัวข้อ
+                  </label>
+                  <input
+                    id="subject"
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    maxLength={300}
+                    className="w-full min-w-0 bg-transparent py-2.5 text-base focus:outline-none"
+                    placeholder="เช่น ขอเอกสารประกอบการพิจารณา"
+                    autoFocus
+                  />
+                </div>
               </div>
+              {splitEmails(ccText).length > 0 && (
+                <p className="hint -mt-2">
+                  📌 ทุกคนใน Cc จะได้สำเนาทุกฉบับ (ส่ง {Math.max(recipients.length, 1)} คน = ได้ {Math.max(recipients.length, 1)}{" "}
+                  ฉบับ) · Gmail นับโควตารวม Cc ด้วย
+                </p>
+              )}
               <div>
                 <span className="label">เนื้อหา</span>
                 <RichTextEditor defaultValue={body} placeholder="เรียน คุณ{ชื่อ} ..." onChange={onBodyChange} />
@@ -232,6 +288,7 @@ export function CampaignWizard({
                 sampleName={sampleName}
                 sender={sender}
                 attachments={attachments}
+                cc={splitEmails(ccText)}
               />
             </div>
           </div>

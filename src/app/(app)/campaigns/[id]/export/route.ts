@@ -34,7 +34,7 @@ export async function GET(request: Request, ctx: RouteContext<"/campaigns/[id]/e
     db().from("campaigns").select("subject").eq("id", id).maybeSingle(),
     db()
       .from("recipients")
-      .select("name,email,status,sent_at,followup_sent_at,replied_at,reply_files,note,error")
+      .select("*")
       .eq("campaign_id", id)
       .order("created_at", { ascending: true }),
   ]);
@@ -42,11 +42,12 @@ export async function GET(request: Request, ctx: RouteContext<"/campaigns/[id]/e
   if (error) return new Response("error: " + error.message, { status: 500 });
 
   const list = (rows as Recipient[]).filter((r) => !filter.statuses || filter.statuses.includes(r.status));
-  const header = ["ชื่อ", "อีเมล", "สถานะ", "ส่งเมื่อ", "ส่งซ้ำเมื่อ", "ส่งงานกลับเมื่อ", "ไฟล์ที่ส่งกลับ", "หมายเหตุ / สาเหตุ"];
+  const header = ["ชื่อ", "อีเมล", "CC", "สถานะ", "ส่งเมื่อ", "ส่งซ้ำเมื่อ", "ส่งงานกลับเมื่อ", "ไฟล์ที่ส่งกลับ", "หมายเหตุ / สาเหตุ"];
   const lines = list.map((r) =>
     [
       r.name,
       r.email,
+      (r.cc_emails ?? []).join("; "),
       STATUS_LABEL[r.status],
       r.sent_at ? formatDateTime(r.sent_at) : "",
       r.followup_sent_at ? formatDateTime(r.followup_sent_at) : "",

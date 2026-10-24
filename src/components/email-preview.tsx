@@ -15,7 +15,9 @@ export function EmailPreview({
   sender,
   label,
   attachments,
+  cc,
 }: {
+  cc?: string[];
   subject: string;
   html: string;
   sampleName: string;
@@ -41,7 +43,10 @@ export function EmailPreview({
               <b className="text-slate-900">{fromName}</b>
               {sender.name && <span className="text-slate-500"> &lt;{sender.email}&gt;</span>}
             </div>
-            <div className="text-slate-500">ถึง {sampleName || "ผู้รับ"}</div>
+            <div className="text-slate-500">
+              ถึง {sampleName || "ผู้รับ"}
+              {cc && cc.length > 0 && <span className="break-all"> · Cc {cc.join(", ")}</span>}
+            </div>
           </div>
         </div>
       </div>

@@ -48,7 +48,15 @@ export type OutgoingEmail = {
   attachToFollowup?: boolean;
   /** ลายเซ็นท้ายอีเมล (HTML) */
   signatureHtml?: string;
+  /** สำเนาถึง (CC) */
+  cc?: string[];
 };
+
+/** รวม CC ของข้อความ + ของผู้รับ ตัดซ้ำ และตัดอีเมลผู้รับ/ผู้ส่งออก */
+export function mergeCc(toEmail: string, ...lists: (string[] | null | undefined)[]): string[] {
+  const skip = new Set([toEmail.toLowerCase(), (process.env.GMAIL_USER ?? "").toLowerCase()]);
+  return [...new Set(lists.flatMap((l) => l ?? []).map((e) => e.toLowerCase()))].filter((e) => !skip.has(e));
+}
 
 // ค่าเดียวกับ .email-content ใน globals.css — ตัวอย่างบนเว็บจึงตรงกับที่ผู้รับเห็น
 const EMAIL_CSS = `p{margin:0 0 12px}li p{margin:0}ul,ol{margin:0 0 12px;padding-left:24px}h2{font-size:20px;margin:16px 0 8px}h3{font-size:17px;margin:16px 0 8px}hr{border:0;border-top:1px solid #e2e8f0;margin:16px 0}a{color:#1d4ed8}`;
@@ -113,6 +121,7 @@ export async function sendEmail(transport: Transporter, email: OutgoingEmail): P
   await transport.sendMail({
     from: { name: email.senderName || "", address: gmailUser() },
     to: { name: email.toName, address: email.toEmail },
+    ...(email.cc?.length ? { cc: email.cc } : {}),
     subject: isFollowup ? `Re: ${subject}` : subject,
     html: wrapHtml(html),
     text: htmlToText(html),

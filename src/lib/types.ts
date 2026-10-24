@@ -12,12 +12,12 @@ export const STATUS_LABEL: Record<RecipientStatus, string> = {
 };
 
 export const STATUS_STYLE: Record<RecipientStatus, string> = {
-  pending: "bg-slate-100 text-slate-700",
-  sent: "bg-blue-100 text-blue-800",
-  replied: "bg-green-100 text-green-800",
-  followed_up: "bg-amber-100 text-amber-800",
-  failed: "bg-red-100 text-red-800",
-  stopped: "bg-zinc-200 text-zinc-600",
+  pending: "bg-slate-100 text-slate-700 ring-1 ring-slate-200",
+  sent: "bg-indigo-100 text-indigo-800 ring-1 ring-indigo-200",
+  replied: "bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200",
+  followed_up: "bg-amber-100 text-amber-800 ring-1 ring-amber-200",
+  failed: "bg-rose-100 text-rose-800 ring-1 ring-rose-200",
+  stopped: "bg-zinc-200 text-zinc-600 ring-1 ring-zinc-300",
 };
 
 export type Campaign = {
@@ -31,6 +31,8 @@ export type Campaign = {
   attachments: Attachment[];
   /** แนบไฟล์ไปกับอีเมลส่งซ้ำด้วย (มีหลังรัน SQL 006) */
   followup_attach?: boolean;
+  /** CC ทุกฉบับ (SQL 007) */
+  cc_emails?: string[];
   created_at: string;
   updated_at: string;
 };
@@ -59,6 +61,8 @@ export type Recipient = {
   replied_at: string | null;
   reply_files: ReplyFile[] | null;
   reply_url: string | null;
+  /** CC เฉพาะคนนี้ (SQL 007) */
+  cc_emails?: string[];
   note: string | null;
   error: string | null;
   created_at: string;

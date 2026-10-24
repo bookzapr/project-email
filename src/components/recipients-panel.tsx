@@ -10,13 +10,13 @@ import type { RecipientAction } from "@/app/(app)/campaigns/actions";
 
 type Filter = "all" | "waiting" | "replied" | "problem" | "pending" | "stopped";
 
-const FILTERS: { key: Filter; label: string; match: (s: RecipientStatus) => boolean; tile: string }[] = [
-  { key: "all", label: "ทั้งหมด", match: () => true, tile: "text-slate-900" },
-  { key: "waiting", label: "รอส่งงาน", match: (s) => s === "sent" || s === "followed_up", tile: "text-amber-700" },
-  { key: "replied", label: "ส่งงานแล้ว", match: (s) => s === "replied", tile: "text-green-700" },
-  { key: "problem", label: "มีปัญหา", match: (s) => s === "failed", tile: "text-red-700" },
-  { key: "pending", label: "ยังไม่ได้ส่ง", match: (s) => s === "pending", tile: "text-slate-700" },
-  { key: "stopped", label: "หยุดแล้ว", match: (s) => s === "stopped", tile: "text-zinc-500" },
+const FILTERS: { key: Filter; label: string; match: (s: RecipientStatus) => boolean; tile: string; icon: string }[] = [
+  { key: "all", label: "ทั้งหมด", match: () => true, tile: "from-indigo-500 to-violet-500", icon: "👥" },
+  { key: "waiting", label: "รอส่งงาน", match: (s) => s === "sent" || s === "followed_up", tile: "from-amber-400 to-orange-500", icon: "⏳" },
+  { key: "replied", label: "ส่งงานแล้ว", match: (s) => s === "replied", tile: "from-emerald-400 to-teal-500", icon: "✅" },
+  { key: "problem", label: "มีปัญหา", match: (s) => s === "failed", tile: "from-rose-400 to-pink-500", icon: "⚠️" },
+  { key: "pending", label: "ยังไม่ได้ส่ง", match: (s) => s === "pending", tile: "", icon: "🕒" },
+  { key: "stopped", label: "หยุดแล้ว", match: (s) => s === "stopped", tile: "", icon: "⏹" },
 ];
 
 type Optimistic = { id: string; action: RecipientAction };
@@ -78,10 +78,13 @@ export function RecipientsPanel({
             key={f.key}
             type="button"
             onClick={() => setFilter(f.key)}
-            className={`card p-3 text-left transition sm:p-4 ${filter === f.key ? "border-blue-500 ring-2 ring-blue-200" : "hover:border-slate-300"}`}
+            className={`relative overflow-hidden rounded-2xl bg-linear-to-br ${f.tile} p-3 text-left text-white shadow-lg transition hover:-translate-y-0.5 sm:p-4 ${
+              filter === f.key ? "ring-4 ring-violet-300 ring-offset-2" : "opacity-90 hover:opacity-100"
+            }`}
           >
-            <div className={`text-2xl font-semibold ${f.tile}`}>{counts[f.key]}</div>
-            <div className="text-sm text-slate-600">{f.label}</div>
+            <span className="absolute -top-2 -right-1 text-5xl opacity-25">{f.icon}</span>
+            <div className="text-3xl font-bold">{counts[f.key]}</div>
+            <div className="text-sm font-medium text-white/90">{f.label}</div>
           </button>
         ))}
       </div>
@@ -90,23 +93,29 @@ export function RecipientsPanel({
       {adding ? (
         <AddPanel onAdd={onAdd} existing={list} onClose={recipients.length ? () => setAdding(false) : undefined} />
       ) : (
-        <button type="button" className="btn w-full border-dashed py-3" onClick={() => setAdding(true)}>
+        <button
+          type="button"
+          className="w-full rounded-2xl border-2 border-dashed border-violet-300 bg-white/60 py-3 font-semibold text-violet-700 transition hover:border-violet-500 hover:bg-violet-50"
+          onClick={() => setAdding(true)}
+        >
           + เพิ่มผู้รับ
         </button>
       )}
 
       {/* ---- รายชื่อ ---- */}
       {list.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-          <div className="flex flex-col gap-2 border-b border-slate-200 p-3 sm:flex-row sm:items-center">
+        <div className="overflow-hidden rounded-2xl bg-white shadow-[0_4px_24px_-8px_rgb(79_70_229/0.18)] ring-1 ring-indigo-100">
+          <div className="flex flex-col gap-2 border-b border-indigo-100 bg-indigo-50/50 p-3 sm:flex-row sm:items-center">
             <div className="flex flex-wrap gap-1.5 text-sm">
               {FILTERS.filter((f) => f.key === "all" || counts[f.key] > 0).map((f) => (
                 <button
                   key={f.key}
                   type="button"
                   onClick={() => setFilter(f.key)}
-                  className={`rounded-full px-3 py-1 ${
-                    filter === f.key ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  className={`rounded-full px-3 py-1 font-medium transition ${
+                    filter === f.key
+                      ? "bg-linear-to-r from-indigo-600 to-violet-600 text-white shadow"
+                      : "bg-white text-indigo-900 ring-1 ring-indigo-200 hover:bg-violet-50"
                   }`}
                 >
                   {f.label} {counts[f.key]}
@@ -137,7 +146,7 @@ export function RecipientsPanel({
           {shown.length === 0 ? (
             <p className="p-6 text-center text-sm text-slate-500">ไม่มีผู้รับในกลุ่มนี้</p>
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-indigo-50">
               {shown.map((r) => (
                 <Row key={r.id} r={r} run={run} />
               ))}
@@ -149,15 +158,33 @@ export function RecipientsPanel({
   );
 }
 
+const AVATAR: Record<RecipientStatus, string> = {
+  pending: "from-slate-300 to-slate-400",
+  sent: "from-indigo-400 to-violet-500",
+  followed_up: "from-amber-400 to-orange-500",
+  replied: "from-emerald-400 to-teal-500",
+  failed: "from-rose-400 to-pink-500",
+  stopped: "from-zinc-300 to-zinc-400",
+};
+
 function Row({ r, run }: { r: Recipient; run: (id: string, a: RecipientAction) => void }) {
   return (
-    <li className="flex items-start gap-3 px-4 py-3">
+    <li className="flex items-start gap-3 px-4 py-3 transition hover:bg-violet-50/40">
+      <span
+        className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-linear-to-br ${AVATAR[r.status]} text-sm font-bold text-white shadow`}
+        aria-hidden
+      >
+        {r.name.trim().slice(0, 1) || "?"}
+      </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{r.name}</span>
           <StatusBadge status={r.status} />
         </div>
         <div className="truncate text-sm text-slate-500">{r.email}</div>
+        {(r.cc_emails?.length ?? 0) > 0 && (
+          <div className="truncate text-xs text-sky-700">Cc {r.cc_emails!.join(", ")}</div>
+        )}
         <Detail r={r} />
       </div>
       <RowMenu r={r} run={run} />

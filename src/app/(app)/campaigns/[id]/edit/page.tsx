@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "แก้ไขข้อความ
 export default function EditCampaignPage({ params }: PageProps<"/campaigns/[id]/edit">) {
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">แก้ไขข้อความ</h1>
+      <h1 className="page-title">แก้ไขข้อความ</h1>
       <Suspense fallback={<FormSkeleton />}>
         <EditForm params={params} />
       </Suspense>
@@ -45,6 +45,7 @@ async function EditForm({ params }: { params: PageProps<"/campaigns/[id]/edit">[
           followup_minutes: c.followup_after_minutes,
           attachments: c.attachments ?? [],
           followup_attach: Boolean(c.followup_attach),
+          cc_emails: c.cc_emails ?? [],
         }}
       />
     </>
