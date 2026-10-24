@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
+import { AttachmentBar } from "@/components/attachment-bar";
 import { EmailPreview } from "@/components/email-preview";
+import type { Attachment } from "@/lib/attachments";
 import { RecipientPicker } from "@/components/recipient-picker";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { UNIT_LABEL, UNIT_MINUTES, splitMinutes, type DelayUnit } from "@/lib/format";
@@ -27,6 +29,7 @@ export type WizardInitial = {
   followup_body_html: string | null;
   send_at_local: string;
   followup_minutes: number;
+  attachments: Attachment[];
 };
 
 export function CampaignWizard({
@@ -62,6 +65,7 @@ export function CampaignWizard({
     if (previewTimer.current) clearTimeout(previewTimer.current);
     previewTimer.current = setTimeout(() => setBody(html), 200);
   };
+  const [attachments, setAttachments] = useState<Attachment[]>(initial.attachments);
   const [sampleName, setSampleName] = useState("สมชาย ใจดี");
   const [mobileTab, setMobileTab] = useState<"write" | "preview">("write");
   const [followupBody, setFollowupBody] = useState(initial.followup_body_html ?? "");
@@ -86,6 +90,7 @@ export function CampaignWizard({
     send_now: sendNow,
     send_at_local: sendAt,
     followup_minutes: followupMinutes,
+    attachments,
   });
 
   // ---- ไปขั้นถัดไป (ตรวจข้อมูลก่อน) ----
@@ -196,8 +201,11 @@ export function CampaignWizard({
               <div>
                 <span className="label">เนื้อหา</span>
                 <RichTextEditor defaultValue={body} placeholder="เรียน คุณ{ชื่อ} ..." onChange={onBodyChange} />
-                <p className="hint">กดปุ่ม “+ ใส่ชื่อผู้รับ” ตรงไหน ระบบจะเปลี่ยนเป็นชื่อของแต่ละคนให้เองตอนส่ง</p>
+                <p className="hint">
+                  กด “+ ใส่ชื่อผู้รับ” ตรงไหน ระบบจะเปลี่ยนเป็นชื่อของแต่ละคนให้เอง · รูปภาพ: กดปุ่มรูป หรือวาง/ลากรูปมาใส่ได้เลย
+                </p>
               </div>
+              <AttachmentBar value={attachments} onChange={setAttachments} />
             </div>
 
             <div className={`space-y-2 lg:sticky lg:top-16 ${mobileTab === "preview" ? "" : "hidden lg:block"}`}>
@@ -212,7 +220,13 @@ export function CampaignWizard({
                   />
                 </label>
               </div>
-              <EmailPreview subject={subject} html={body} sampleName={sampleName} sender={sender} />
+              <EmailPreview
+                subject={subject}
+                html={body}
+                sampleName={sampleName}
+                sender={sender}
+                attachments={attachments}
+              />
             </div>
           </div>
         </>
@@ -321,6 +335,7 @@ export function CampaignWizard({
             followupMinutes={followupMinutes}
             sender={sender}
             fallbackName={sampleName}
+            attachments={attachments}
           />
 
           <div className="card flex flex-col gap-2">
@@ -408,6 +423,7 @@ function Summary(props: {
   followupMinutes: number;
   sender: { name: string; email: string };
   fallbackName: string;
+  attachments: Attachment[];
 }) {
   const [open, setOpen] = useState(false);
   const sample = props.recipients[0]?.name ?? props.fallbackName;
@@ -434,6 +450,8 @@ function Summary(props: {
             <dd>{props.recipients.length} คน (ส่งแยกทีละคน ผู้รับไม่เห็นกัน)</dd>
           </>
         )}
+        <dt className="text-slate-500">ไฟล์แนบ</dt>
+        <dd>{props.attachments.length ? props.attachments.map((a) => a.name).join(", ") : "ไม่มี"}</dd>
         <dt className="text-slate-500">ส่ง</dt>
         <dd>{when}</dd>
         <dt className="text-slate-500">ส่งซ้ำ</dt>
@@ -450,6 +468,7 @@ function Summary(props: {
             html={props.bodyHtml}
             sampleName={sample}
             sender={props.sender}
+            attachments={props.attachments}
           />
           {props.followupMinutes > 0 && (
             <EmailPreview

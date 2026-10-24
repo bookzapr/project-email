@@ -5,8 +5,12 @@ import StarterKit from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extensions";
 import { BackgroundColor, Color, FontFamily, FontSize, TextStyle } from "@tiptap/extension-text-style";
 import TextAlign from "@tiptap/extension-text-align";
+import Image from "@tiptap/extension-image";
+import type { EditorView } from "@tiptap/pm/view";
 import { useEffect, useRef, useState } from "react";
+import { IMAGE_TYPES } from "@/lib/attachments";
 import { COLORS, FONTS, Indent, SIZES } from "@/lib/editor-extensions";
+import { uploadFile } from "@/lib/upload-client";
 
 type Props = {
   defaultValue?: string;
@@ -17,6 +21,27 @@ type Props = {
 };
 
 export function RichTextEditor({ defaultValue = "", placeholder, onChange, minHeight = "14rem" }: Props) {
+  const [uploading, setUploading] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  /** อัปโหลดรูปแล้วแทรกที่ตำแหน่งเคอร์เซอร์ (ใช้กับปุ่ม, วาง, ลากมาวาง) */
+  const insertImages = async (view: EditorView, files: File[], pos?: number) => {
+    setUploadError(null);
+    for (const file of files) {
+      setUploading((n) => n + 1);
+      const res = await uploadFile("image", file);
+      setUploading((n) => n - 1);
+      if ("error" in res) {
+        setUploadError(res.error);
+        continue;
+      }
+      const node = view.state.schema.nodes.image.create({ src: res.publicUrl, alt: file.name, width: 300 });
+      const tr = pos != null ? view.state.tr.insert(pos, node) : view.state.tr.replaceSelectionWith(node);
+      view.dispatch(tr);
+    }
+  };
+  const imageFiles = (list: FileList | null | undefined) => [...(list ?? [])].filter((f) => f.type.startsWith("image/"));
+
   const editor = useEditor({
     immediatelyRender: false,
     shouldRerenderOnTransaction: false,
@@ -34,11 +59,25 @@ export function RichTextEditor({ defaultValue = "", placeholder, onChange, minHe
       FontSize,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Indent,
+      Image.configure({ inline: false, allowBase64: false }),
       Placeholder.configure({ placeholder: placeholder ?? "" }),
     ],
     content: defaultValue,
     editorProps: {
       attributes: { class: "px-4 py-3 focus:outline-none", style: `min-height:${minHeight}` },
+      handlePaste: (view, event) => {
+        const files = imageFiles(event.clipboardData?.files);
+        if (!files.length) return false;
+        void insertImages(view, files);
+        return true;
+      },
+      handleDrop: (view, event) => {
+        const files = imageFiles(event.dataTransfer?.files);
+        if (!files.length) return false;
+        const pos = view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos;
+        void insertImages(view, files, pos);
+        return true;
+      },
     },
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
   });
@@ -48,7 +87,16 @@ export function RichTextEditor({ defaultValue = "", placeholder, onChange, minHe
       <div className="email-content overflow-hidden rounded-t-lg">
         <EditorContent editor={editor} />
       </div>
-      {editor ? <Toolbar editor={editor} /> : <div className="h-11 border-t border-slate-200 bg-slate-50" />}
+      {(uploading > 0 || uploadError) && (
+        <div className={`px-4 py-1.5 text-sm ${uploadError ? "text-red-700" : "text-slate-500"}`}>
+          {uploading > 0 ? `กำลังอัปโหลดรูป (${uploading})...` : uploadError}
+        </div>
+      )}
+      {editor ? (
+        <Toolbar editor={editor} onPickImages={(files) => insertImages(editor.view, files)} />
+      ) : (
+        <div className="h-11 border-t border-slate-200 bg-slate-50" />
+      )}
     </div>
   );
 }
@@ -57,7 +105,9 @@ export function RichTextEditor({ defaultValue = "", placeholder, onChange, minHe
 // แถบเครื่องมือ (แบบ Gmail)
 // =====================================================================
 
-function Toolbar({ editor }: { editor: Editor }) {
+function Toolbar({ editor, onPickImages }: { editor: Editor; onPickImages: (files: File[]) => void }) {
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [linkOpen, setLinkOpen] = useState(false);
   const s = useEditorState({
     editor,
     selector: ({ editor }) => {
@@ -71,6 +121,8 @@ function Toolbar({ editor }: { editor: Editor }) {
         ordered: editor.isActive("orderedList"),
         quote: editor.isActive("blockquote"),
         link: editor.isActive("link"),
+        image: editor.isActive("image"),
+        imageWidth: (editor.getAttributes("image").width as number | null) ?? null,
         align: (["center", "right", "justify"].find((a) => editor.isActive({ textAlign: a })) ?? "left") as string,
         font: (style.fontFamily as string | undefined) ?? null,
         size: (style.fontSize as string | undefined) ?? null,
@@ -81,14 +133,6 @@ function Toolbar({ editor }: { editor: Editor }) {
     },
   });
   const c = () => editor.chain().focus();
-
-  const setLink = () => {
-    const prev = editor.getAttributes("link").href as string | undefined;
-    const url = window.prompt("ใส่ลิงก์ (เว้นว่างเพื่อลบลิงก์)", prev ?? "https://");
-    if (url === null) return;
-    if (url.trim() === "" || url.trim() === "https://") c().extendMarkRange("link").unsetLink().run();
-    else c().extendMarkRange("link").setLink({ href: url.trim() }).run();
-  };
 
   const fontLabel = FONTS.find((f) => f.value === s.font)?.label.replace(/ \(.*\)$/, "") ?? "แบบอักษร";
 
@@ -211,9 +255,42 @@ function Toolbar({ editor }: { editor: Editor }) {
         <Icon d={P.strike} />
       </Btn>
       <Sep />
-      <Btn title="ใส่ลิงก์" active={s.link} onClick={setLink}>
+      <Btn title="ใส่ลิงก์" active={s.link} onClick={() => setLinkOpen(true)}>
         <Icon d={P.link} />
       </Btn>
+      <Btn title="แทรกรูปภาพ" onClick={() => fileInput.current?.click()}>
+        <Icon d={P.image} />
+      </Btn>
+      <input
+        ref={fileInput}
+        type="file"
+        accept={IMAGE_TYPES.join(",")}
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          onPickImages([...(e.target.files ?? [])]);
+          e.target.value = "";
+        }}
+      />
+      {s.image && (
+        <Dropdown title="ขนาดรูป" label={<span className="text-sm">ขนาดรูป</span>}>
+          {(close) =>
+            IMAGE_WIDTHS.map((w) => (
+              <MenuItem
+                key={w.label}
+                active={s.imageWidth === w.value}
+                onClick={() => {
+                  c().updateAttributes("image", { width: w.value, height: null }).run();
+                  close();
+                }}
+              >
+                {w.label}
+              </MenuItem>
+            ))
+          }
+        </Dropdown>
+      )}
+      {linkOpen && <LinkDialog editor={editor} onClose={() => setLinkOpen(false)} />}
       <Btn title="เส้นคั่น" onClick={() => c().setHorizontalRule().run()}>
         <Icon d={P.hr} />
       </Btn>
@@ -230,6 +307,107 @@ function Toolbar({ editor }: { editor: Editor }) {
       >
         + ใส่ชื่อผู้รับ
       </button>
+    </div>
+  );
+}
+
+const IMAGE_WIDTHS = [
+  { label: "เล็ก", value: 150 },
+  { label: "กลาง", value: 300 },
+  { label: "ใหญ่", value: 450 },
+  { label: "เต็มความกว้าง", value: 600 },
+];
+
+/** หน้าต่างใส่/แก้ลิงก์ แบบ Gmail: ข้อความที่แสดง + ลิงก์ */
+function LinkDialog({ editor, onClose }: { editor: Editor; onClose: () => void }) {
+  const { from, to, empty } = editor.state.selection;
+  const prevHref = (editor.getAttributes("link").href as string | undefined) ?? "";
+  const [text, setText] = useState(() => (empty ? "" : editor.state.doc.textBetween(from, to, " ")));
+  const [url, setUrl] = useState(prevHref);
+  const [error, setError] = useState<string | null>(null);
+
+  const normalize = (raw: string) => {
+    const u = raw.trim();
+    if (!u) return "";
+    if (/^(https?:|mailto:)/i.test(u)) return u;
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(u)) return `mailto:${u}`;
+    return `https://${u}`;
+  };
+
+  const save = () => {
+    const href = normalize(url);
+    if (!href) return setError("กรุณาใส่ลิงก์");
+    const label = text.trim() || url.trim();
+    editor
+      .chain()
+      .focus()
+      .extendMarkRange("link")
+      .insertContent({ type: "text", text: label, marks: [{ type: "link", attrs: { href } }] })
+      .run();
+    onClose();
+  };
+  const remove = () => {
+    editor.chain().focus().extendMarkRange("link").unsetLink().run();
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onMouseDown={onClose}>
+      <div
+        role="dialog"
+        aria-label="แก้ไขลิงก์"
+        className="w-full max-w-md space-y-3 rounded-xl bg-white p-5 shadow-xl"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-lg font-semibold">{prevHref ? "แก้ไขลิงก์" : "ใส่ลิงก์"}</h3>
+        <div>
+          <label htmlFor="link-text" className="label">
+            ข้อความที่แสดง
+          </label>
+          <input
+            id="link-text"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            className="input"
+            placeholder="เช่น ดาวน์โหลดแบบฟอร์ม"
+          />
+        </div>
+        <div>
+          <label htmlFor="link-url" className="label">
+            ลิงก์ (เว็บไซต์ หรืออีเมล)
+          </label>
+          <input
+            id="link-url"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                save();
+              }
+            }}
+            className="input"
+            placeholder="https://..."
+            autoFocus
+          />
+        </div>
+        {error && <p className="alert-error">{error}</p>}
+        <div className="flex items-center gap-2 pt-1">
+          {prevHref && (
+            <button type="button" className="text-sm text-red-600 hover:underline" onClick={remove}>
+              ลบลิงก์
+            </button>
+          )}
+          <div className="ml-auto flex gap-2">
+            <button type="button" className="btn" onClick={onClose}>
+              ยกเลิก
+            </button>
+            <button type="button" className="btn-primary" onClick={save}>
+              ตกลง
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -411,5 +589,7 @@ const P = {
   quote: "M6 17h3l2-4V7H5v6h3zm8 0h3l2-4V7h-6v6h3z",
   link: "M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z",
   hr: "M4 11h16v2H4z",
+  image: "M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z",
+  attach: "M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z",
   clear: "M3.27 5L2 6.27l6.97 6.97L6.5 19h3l1.57-3.66L16.73 21 18 19.73 3.55 5.27 3.27 5zM6 5v.18L8.82 8h2.4l-.72 1.68 2.1 2.1L14.21 8H20V5H6z",
 };

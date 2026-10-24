@@ -38,6 +38,7 @@ async function NewForm() {
         followup_body_html: null,
         send_at_local: toBangkokInput(nextHourIso()),
         followup_minutes: 60 * 24 * 3,
+        attachments: [],
       }}
     />
   );

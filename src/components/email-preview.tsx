@@ -1,5 +1,7 @@
 "use client";
 
+import { AttachmentList } from "@/components/attachment-bar";
+import type { Attachment } from "@/lib/attachments";
 import { fillHtml, fillText, isBlankHtml } from "@/lib/template";
 
 /** ตัวอย่างอีเมลหน้าตาแบบที่ผู้รับเปิดดูใน Gmail ({ชื่อ} ถูกแทนด้วย sampleName แล้ว) */
@@ -9,12 +11,14 @@ export function EmailPreview({
   sampleName,
   sender,
   label,
+  attachments,
 }: {
   subject: string;
   html: string;
   sampleName: string;
   sender: { name: string; email: string };
   label?: string;
+  attachments?: Attachment[];
 }) {
   const shownSubject = fillText(subject, sampleName).trim();
   const fromName = sender.name || sender.email;
@@ -45,6 +49,11 @@ export function EmailPreview({
           <div dangerouslySetInnerHTML={{ __html: fillHtml(html, sampleName) }} />
         )}
       </div>
+      {attachments && attachments.length > 0 && (
+        <div className="border-t border-slate-100 px-4 py-3 sm:pl-[4.25rem]">
+          <AttachmentList items={attachments} />
+        </div>
+      )}
     </div>
   );
 }

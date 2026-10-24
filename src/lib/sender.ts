@@ -1,6 +1,8 @@
 import "server-only";
 import { db } from "./db";
+import type { Attachment } from "./attachments";
 import { classifySendError, createTransport, sendEmail } from "./mailer";
+import { loadMailFiles, type MailFiles } from "./storage";
 
 // ตัวส่งอีเมล 1 รอบ — ถูกเรียกจากตัวตั้งเวลาผ่าน /api/cron/tick ทุก 1–2 นาที
 // ส่งเป็นชุดเล็กๆ และหยุดเองเมื่อใกล้หมดเวลา ส่วนที่เหลือรอรอบถัดไป
@@ -60,6 +62,21 @@ export async function runSendRound(opts: {
   const token = rows[0].lock_token;
   const transport = createTransport();
 
+  // ไฟล์แนบ/รูป: โหลดครั้งเดียวต่อข้อความ ใช้ซ้ำกับทุกผู้รับในรอบนี้
+  const filesCache = new Map<string, Promise<MailFiles>>();
+  const filesFor = (row: ClaimedRow) => {
+    if (!filesCache.has(row.campaign_id)) {
+      filesCache.set(
+        row.campaign_id,
+        (async () => {
+          const { data } = await db().from("campaigns").select("attachments").eq("id", row.campaign_id).single();
+          return loadMailFiles((data?.attachments ?? []) as Attachment[], [row.body_html, row.followup_body_html]);
+        })(),
+      );
+    }
+    return filesCache.get(row.campaign_id)!;
+  };
+
   try {
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -86,6 +103,7 @@ export async function runSendRound(opts: {
       }
 
       try {
+        const files = await filesFor(row);
         const messageId = await sendEmail(transport, {
           kind: row.kind,
           toName: row.name,
@@ -95,6 +113,7 @@ export async function runSendRound(opts: {
           followupBodyHtml: row.followup_body_html,
           originalMessageId: row.message_id,
           senderName: settings.sender_name,
+          files,
         });
         await complete(row, token, { p_success: true, p_message_id: messageId });
         result.sent++;

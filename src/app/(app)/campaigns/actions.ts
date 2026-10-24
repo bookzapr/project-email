@@ -9,6 +9,8 @@ import { fromBangkokInput } from "@/lib/format";
 import { classifySendError, createTransport, gmailUser, sendEmail } from "@/lib/mailer";
 import { parseRecipients, type ParsedRecipient } from "@/lib/parse-recipients";
 import { sanitizeEmailHtml } from "@/lib/sanitize";
+import { type Attachment, checkAttachment, checkImage } from "@/lib/attachments";
+import { createUploadLink, deleteFiles, imagePathsInAll, loadMailFiles, verifyAttachments } from "@/lib/storage";
 import { isBlankHtml } from "@/lib/template";
 import type { FormState } from "@/lib/types";
 
@@ -29,6 +31,7 @@ export type CampaignDraft = {
   send_at_local: string;
   /** 0 = ไม่ส่งซ้ำ */
   followup_minutes: number;
+  attachments: Attachment[];
 };
 
 type CampaignRow = {
@@ -37,6 +40,7 @@ type CampaignRow = {
   followup_body_html: string | null;
   send_at: string;
   followup_after_minutes: number;
+  attachments: Attachment[];
 };
 
 function validateDraft(d: CampaignDraft): CampaignRow | { error: string } {
@@ -53,7 +57,16 @@ function validateDraft(d: CampaignDraft): CampaignRow | { error: string } {
     return { error: "ระยะเวลาส่งซ้ำไม่ถูกต้อง" };
   }
 
+  const attachments: Attachment[] = [];
+  for (const a of Array.isArray(d.attachments) ? d.attachments : []) {
+    const item = { name: String(a.name ?? ""), path: String(a.path ?? ""), size: Number(a.size) || 0, type: String(a.type ?? "") };
+    const problem = checkAttachment(item.name, item.size, attachments);
+    if (problem) return { error: problem };
+    attachments.push(item);
+  }
+
   return {
+    attachments,
     subject,
     body_html: sanitizeEmailHtml(d.body_html),
     followup_body_html: minutes > 0 && !isBlankHtml(d.followup_body_html) ? sanitizeEmailHtml(d.followup_body_html) : null,
@@ -79,6 +92,8 @@ export async function createCampaignWithRecipients(
   const people = cleanRecipients(recipients);
   if (people.length === 0) return { error: "กรุณาเพิ่มผู้รับอย่างน้อย 1 คน" };
   if (people.length > MAX_RECIPIENTS_PER_ADD) return { error: `ผู้รับได้ไม่เกิน ${MAX_RECIPIENTS_PER_ADD} คนต่อข้อความ` };
+  const missing = await verifyAttachments(row.attachments);
+  if (missing) return { error: missing };
 
   // สร้างแบบ "หยุดไว้ก่อน" แล้วค่อยเปิดหลังใส่ผู้รับครบ กันตัวส่งหยิบไปส่งตอนรายชื่อยังไม่ครบ
   const { data: c, error } = await db()
@@ -105,18 +120,55 @@ export async function updateCampaign(id: string, draft: CampaignDraft): Promise<
   if (!isUuid(id)) return { error: "ไม่พบข้อความนี้" };
   const row = validateDraft(draft);
   if ("error" in row) return { error: row.error };
+  const missing = await verifyAttachments(row.attachments);
+  if (missing) return { error: missing };
 
+  const { data: old } = await db().from("campaigns").select("attachments,body_html,followup_body_html").eq("id", id).single();
   const { error } = await db().from("campaigns").update(row).eq("id", id);
   if (error) return { error: "บันทึกไม่สำเร็จ: " + error.message };
+
+  // ลบไฟล์แนบ/รูปที่ถูกเอาออกจากข้อความแล้ว
+  if (old) {
+    const keepAtt = new Set(row.attachments.map((a) => a.path));
+    const keepImg = new Set(imagePathsInAll([row.body_html, row.followup_body_html]));
+    await deleteFiles(
+      (old.attachments as Attachment[]).map((a) => a.path).filter((p) => !keepAtt.has(p)),
+      imagePathsInAll([old.body_html, old.followup_body_html]).filter((p) => !keepImg.has(p)),
+    ).catch(() => {});
+  }
   redirect(`/campaigns/${id}`);
 }
 
 export async function deleteCampaign(id: string): Promise<void> {
   await requireAuth();
   if (!isUuid(id)) return;
+  const { data: c } = await db().from("campaigns").select("attachments,body_html,followup_body_html").eq("id", id).single();
   const { error } = await db().from("campaigns").delete().eq("id", id);
   if (error) throw new Error("ลบไม่สำเร็จ: " + error.message);
+  if (c) {
+    await deleteFiles(
+      (c.attachments as Attachment[]).map((a) => a.path),
+      imagePathsInAll([c.body_html, c.followup_body_html]),
+    ).catch(() => {});
+  }
   redirect("/");
+}
+
+/** ขอลิงก์อัปโหลดไฟล์แนบ/รูป (browser อัปโหลดตรงไปที่ Supabase) */
+export async function getUploadUrl(
+  kind: "attachment" | "image",
+  file: { name: string; size: number; type: string },
+  existing: { size: number }[] = [],
+): Promise<{ error: string } | { signedUrl: string; path: string; publicUrl: string | null }> {
+  await requireAuth();
+  const problem =
+    kind === "image" ? checkImage(file.name, file.size, file.type) : checkAttachment(file.name, file.size, existing);
+  if (problem) return { error: problem };
+  try {
+    return await createUploadLink(kind, file.name);
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
 }
 
 export async function setCampaignPaused(id: string, paused: boolean): Promise<FormState> {
@@ -214,6 +266,7 @@ type TestContent = {
   body_html: string;
   followup_body_html: string | null;
   followup_after_minutes: number;
+  attachments: Attachment[];
 };
 
 async function sendTestCore(c: TestContent, campaignId: string | null): Promise<FormState> {
@@ -238,7 +291,9 @@ async function sendTestCore(c: TestContent, campaignId: string | null): Promise<
   }
 
   try {
+    const files = await loadMailFiles(c.attachments ?? [], [c.body_html, c.followup_body_html]);
     const base = {
+      files,
       toName: "ทดสอบ",
       toEmail: me,
       subject: `[ทดสอบ] ${c.subject}`,
@@ -273,7 +328,7 @@ export async function sendTestEmail(campaignId: string): Promise<FormState> {
   if (!isUuid(campaignId)) return { error: "ไม่พบข้อความนี้" };
   const { data: c, error } = await db()
     .from("campaigns")
-    .select("subject,body_html,followup_body_html,followup_after_minutes")
+    .select("subject,body_html,followup_body_html,followup_after_minutes,attachments")
     .eq("id", campaignId)
     .single();
   if (error) return { error: "อ่านข้อความไม่ได้: " + error.message };

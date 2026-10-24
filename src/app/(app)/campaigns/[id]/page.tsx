@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { AttachmentList } from "@/components/attachment-bar";
 import { DeleteButton, PauseButton, TestButton } from "@/components/campaign-buttons";
 import { RecipientsPanel } from "@/components/recipients-panel";
 import { DetailSkeleton } from "@/components/ui";
@@ -71,6 +72,7 @@ function Header({ c }: { c: Campaign }) {
           </>
         )}
       </details>
+      <AttachmentList items={c.attachments} />
       <div className="flex flex-wrap items-center gap-2">
         <Link href={`/campaigns/${c.id}/edit`} className="btn">
           แก้ไข

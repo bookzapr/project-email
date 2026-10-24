@@ -42,6 +42,7 @@ async function EditForm({ params }: { params: PageProps<"/campaigns/[id]/edit">[
           followup_body_html: c.followup_body_html,
           send_at_local: toBangkokInput(c.send_at),
           followup_minutes: c.followup_after_minutes,
+          attachments: c.attachments ?? [],
         }}
       />
     </>

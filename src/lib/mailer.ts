@@ -1,6 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import nodemailer, { type Transporter } from "nodemailer";
+import type { MailFiles } from "./storage";
 import { fillHtml, fillText, isBlankHtml } from "./template";
 
 // ---------------------------------------------------------------------
@@ -41,6 +42,8 @@ export type OutgoingEmail = {
   /** Message-ID ของอีเมลรอบแรก (ใช้ผูกอีเมลส่งซ้ำให้อยู่ในเธรดเดียวกัน) */
   originalMessageId?: string | null;
   senderName: string;
+  /** ไฟล์แนบ + รูปในเนื้อหา (ไฟล์แนบส่งเฉพาะอีเมลรอบแรก อีเมลส่งซ้ำอยู่ในเธรดเดียวกันอยู่แล้ว) */
+  files?: MailFiles;
 };
 
 // ค่าเดียวกับ .email-content ใน globals.css — ตัวอย่างบนเว็บจึงตรงกับที่ผู้รับเห็น
@@ -62,6 +65,7 @@ export function htmlToText(html: string): string {
     .replace(/<a\s[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gi, (_, href, text) =>
       text.replace(/<[^>]*>/g, "") === href ? href : `${text} (${href})`,
     )
+    .replace(/<img[^>]*>/gi, "[รูปภาพ]")
     .replace(/<li[^>]*>/gi, "• ")
     .replace(/<\/(p|h2|h3|li|blockquote)>/gi, "\n")
     .replace(/<br\s*\/?>/gi, "\n")
@@ -87,9 +91,19 @@ export async function sendEmail(transport: Transporter, email: OutgoingEmail): P
   const isFollowup = email.kind === "followup";
   const subject = fillText(email.subject, email.toName);
   const sourceHtml = isFollowup && !isBlankHtml(email.followupBodyHtml) ? email.followupBodyHtml! : email.bodyHtml;
-  const html = fillHtml(sourceHtml, email.toName);
+  let html = fillHtml(sourceHtml, email.toName);
   const messageId = newMessageId();
   const threadId = isFollowup ? email.originalMessageId : null;
+
+  // รูปในเนื้อหา: เปลี่ยนจากลิงก์เป็นรูปที่ฝังในอีเมล (cid)
+  const inline: { filename: string; content: Buffer; contentType: string; cid: string }[] = [];
+  for (const [url, img] of email.files?.images ?? []) {
+    if (!html.includes(url)) continue;
+    html = html.split(`src="${url}"`).join(`src="cid:${img.cid}"`);
+    inline.push({ filename: img.filename, content: img.content, contentType: img.contentType, cid: img.cid });
+  }
+  html = html.replace(/<img(?![^>]*style=)/g, '<img style="max-width:100%;height:auto"');
+  const attachments = [...inline, ...(isFollowup ? [] : (email.files?.attachments ?? []))];
 
   await transport.sendMail({
     from: { name: email.senderName || "", address: gmailUser() },
@@ -98,6 +112,7 @@ export async function sendEmail(transport: Transporter, email: OutgoingEmail): P
     html: wrapHtml(html),
     text: htmlToText(html),
     messageId,
+    attachments,
     ...(threadId ? { inReplyTo: threadId, references: [threadId] } : {}),
   });
   return messageId;

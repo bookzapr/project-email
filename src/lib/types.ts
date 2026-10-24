@@ -1,3 +1,5 @@
+import type { Attachment } from "./attachments";
+
 export type RecipientStatus = "pending" | "sent" | "replied" | "followed_up" | "failed" | "stopped";
 
 export const STATUS_LABEL: Record<RecipientStatus, string> = {
@@ -26,6 +28,7 @@ export type Campaign = {
   send_at: string;
   followup_after_minutes: number;
   paused: boolean;
+  attachments: Attachment[];
   created_at: string;
   updated_at: string;
 };
