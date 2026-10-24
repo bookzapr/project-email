@@ -20,6 +20,9 @@ export const STATUS_STYLE: Record<RecipientStatus, string> = {
   stopped: "bg-zinc-200 text-zinc-600 ring-1 ring-zinc-300",
 };
 
+/** หมายเหตุของคนที่ผู้ใช้กด "ทำเครื่องหมายว่าส่งงานแล้ว" เอง */
+export const MANUAL_REPLY_NOTE = "ทำเครื่องหมายเอง (เช่น ส่งงานทางช่องทางอื่น)";
+
 export type Campaign = {
   id: string;
   subject: string;

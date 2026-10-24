@@ -5,7 +5,7 @@ import { RecipientPicker } from "@/components/recipient-picker";
 import { StatusBadge } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
 import type { ParsedRecipient } from "@/lib/parse-recipients";
-import type { FormState, Recipient, RecipientStatus } from "@/lib/types";
+import { MANUAL_REPLY_NOTE, type FormState, type Recipient, type RecipientStatus } from "@/lib/types";
 import type { RecipientAction } from "@/app/(app)/campaigns/actions";
 
 type Filter = "all" | "waiting" | "replied" | "problem" | "pending" | "stopped";
@@ -38,6 +38,13 @@ export function RecipientsPanel({
     return state.map((r) => {
       if (r.id !== op.id) return r;
       if (op.action === "stop") return { ...r, status: "stopped" as const };
+      if (op.action === "mark_replied") {
+        return { ...r, status: "replied" as const, replied_at: new Date().toISOString(), note: MANUAL_REPLY_NOTE, error: null };
+      }
+      if (op.action === "unmark_replied") {
+        const status: RecipientStatus = r.followup_sent_at ? "followed_up" : r.sent_at ? "sent" : "pending";
+        return { ...r, status, replied_at: null, reply_files: null, reply_url: null, note: null };
+      }
       const status: RecipientStatus = r.followup_sent_at ? "followed_up" : r.sent_at ? "sent" : "pending";
       return { ...r, status, error: null };
     });
@@ -198,7 +205,10 @@ function Detail({ r }: { r: Recipient }) {
   if (r.status === "replied") {
     return (
       <div className="mt-1 space-y-0.5 text-sm text-green-800">
-        <div>ส่งงานกลับเมื่อ {formatDateTime(r.replied_at)}</div>
+        <div>
+          ส่งงานกลับเมื่อ {formatDateTime(r.replied_at)}
+          {r.note && <span className="text-xs text-slate-500"> · {r.note}</span>}
+        </div>
         {r.reply_files?.map((f, i) => (
           <div key={i} className="truncate">
             {f.kind === "drive_link" ? "🔗 " : "📎 "}
@@ -235,6 +245,14 @@ function Detail({ r }: { r: Recipient }) {
 function RowMenu({ r, run }: { r: Recipient; run: (id: string, a: RecipientAction) => void }) {
   const items: { label: string; action: RecipientAction; danger?: boolean; confirm?: string }[] = [];
   if (r.status === "failed") items.push({ label: "ส่งใหม่", action: "retry" });
+  if (r.status !== "replied") items.push({ label: "✅ ทำเครื่องหมายว่าส่งงานแล้ว", action: "mark_replied" });
+  if (r.status === "replied") {
+    items.push({
+      label: "↩ ยกเลิก “ส่งงานแล้ว”",
+      action: "unmark_replied",
+      confirm: `ยกเลิกสถานะ "ส่งงานแล้ว" ของ ${r.name}? (ระบบจะกลับไปทวงซ้ำตามปกติ)`,
+    });
+  }
   if (["pending", "sent", "followed_up", "failed"].includes(r.status)) items.push({ label: "หยุดส่งคนนี้", action: "stop" });
   if (r.status === "stopped") items.push({ label: "ยกเลิกการหยุด", action: "resume" });
   items.push({ label: "ลบออก", action: "delete", danger: true, confirm: `ลบ ${r.name} ออกจากข้อความนี้?` });
@@ -270,7 +288,7 @@ function RowMenu({ r, run }: { r: Recipient; run: (id: string, a: RecipientActio
         ⋯
       </button>
       {open && (
-        <div className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+        <div className="absolute right-0 z-20 mt-1 w-56 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
           {items.map((it) => (
             <button
               key={it.action}

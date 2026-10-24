@@ -54,6 +54,17 @@ async function Settings() {
         )}
         <SecurityPanel enabled={Boolean(s.totp_enabled)} available={has008} />
       </section>
+
+      <section className="card space-y-3">
+        <h2 className="text-lg font-bold text-teal-950">💾 สำรองข้อมูล</h2>
+        <p className="text-sm text-slate-600">
+          ดาวน์โหลดข้อความ รายชื่อผู้รับ และสถานะทั้งหมดเก็บไว้ในเครื่อง (ไฟล์ .json) — แนะนำให้กดเก็บไว้เดือนละครั้ง
+          เพราะฐานข้อมูลแบบฟรีไม่มีสำรองข้อมูลอัตโนมัติ · ไม่รวมตัวไฟล์แนบ และไม่รวมรหัสลับ
+        </p>
+        <a href="/settings/backup" download className="btn">
+          ⬇ ดาวน์โหลดข้อมูลสำรอง
+        </a>
+      </section>
     </>
   );
 }

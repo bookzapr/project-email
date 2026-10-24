@@ -13,7 +13,7 @@ import { sanitizeEmailHtml } from "@/lib/sanitize";
 import { type Attachment, checkAttachment, checkImage } from "@/lib/attachments";
 import { createUploadLink, deleteFiles, imagePathsInAll, loadMailFiles, verifyAttachments } from "@/lib/storage";
 import { isBlankHtml } from "@/lib/template";
-import type { FormState } from "@/lib/types";
+import { MANUAL_REPLY_NOTE, type FormState } from "@/lib/types";
 
 const MAX_RECIPIENTS_PER_ADD = 2000;
 const MAX_FOLLOWUP_MINUTES = 60 * 24 * 365;
@@ -294,9 +294,9 @@ export async function getRecipientsOf(campaignId: string): Promise<ParsedRecipie
   return (data ?? []).map((r) => ({ name: r.name, email: r.email, cc: r.cc_emails ?? [] }));
 }
 
-export type RecipientAction = "stop" | "resume" | "retry" | "delete";
+export type RecipientAction = "stop" | "resume" | "retry" | "delete" | "mark_replied" | "unmark_replied";
 
-/** หยุด / ยกเลิกหยุด / ส่งใหม่ / ลบ ผู้รับ 1 คน */
+/** หยุด / ยกเลิกหยุด / ส่งใหม่ / ลบ / ทำเครื่องหมายว่าส่งงานแล้ว ผู้รับ 1 คน */
 export async function recipientAction(id: string, action: RecipientAction): Promise<FormState> {
   await requireAuth();
   if (!isUuid(id)) return { error: "ไม่พบผู้รับนี้" };
@@ -320,12 +320,43 @@ export async function recipientAction(id: string, action: RecipientAction): Prom
     return { ok: true };
   }
 
+  // ส่งงานมาทางอื่น (LINE, ยื่นมือ ฯลฯ) → นับว่าส่งแล้ว และจะไม่ถูกทวงซ้ำ
+  if (action === "mark_replied") {
+    const { error } = await db()
+      .from("recipients")
+      .update({ status: "replied", replied_at: new Date().toISOString(), note: MANUAL_REPLY_NOTE, retry_at: null, error: null })
+      .eq("id", id)
+      .neq("status", "replied");
+    if (error) return { error: "บันทึกไม่สำเร็จ: " + error.message };
+    refresh();
+    return { ok: true };
+  }
+
   const { data: r, error: e1 } = await db()
     .from("recipients")
     .select("status,sent_at,followup_sent_at")
     .eq("id", id)
     .single();
   if (e1) return { error: "อ่านข้อมูลไม่ได้: " + e1.message };
+
+  // ยกเลิก "ส่งงานแล้ว" (เช่น ระบบนับผิด หรือกดผิด): กลับไปรอส่งงาน และจะถูกทวงซ้ำตามปกติ
+  if (action === "unmark_replied") {
+    if (r.status !== "replied") return { ok: true };
+    const { error } = await db()
+      .from("recipients")
+      .update({
+        status: r.followup_sent_at ? "followed_up" : r.sent_at ? "sent" : "pending",
+        replied_at: null,
+        reply_files: null,
+        reply_url: null,
+        note: null,
+      })
+      .eq("id", id)
+      .eq("status", "replied");
+    if (error) return { error: "บันทึกไม่สำเร็จ: " + error.message };
+    refresh();
+    return { ok: true };
+  }
 
   // ยกเลิกหยุด: กลับไปสถานะตามที่ส่งไปแล้วจริง
   // ส่งใหม่ (คนที่ผิดพลาด): ถ้ารอบแรกส่งไปแล้ว ให้กลับเป็น "ส่งแล้ว" เพื่อรอส่งซ้ำใหม่

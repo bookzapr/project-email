@@ -96,6 +96,9 @@ function Header({ c }: { c: Campaign }) {
         <Link href={`/campaigns/${c.id}/edit`} className="btn">
           ✏️ แก้ไข
         </Link>
+        <Link href={`/campaigns/new?from=${c.id}`} className="btn" title="สร้างข้อความใหม่จากข้อความนี้ (เนื้อหา ไฟล์แนบ และรายชื่อเดิม)">
+          📋 ทำสำเนา
+        </Link>
         <PauseButton paused={c.paused} onToggle={setCampaignPaused.bind(null, c.id)} />
         <TestButton onTest={sendTestEmail.bind(null, c.id)} />
         <div className="ml-auto">

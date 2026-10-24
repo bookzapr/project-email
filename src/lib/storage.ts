@@ -86,16 +86,7 @@ export function imagePathsInAll(htmls: (string | null)[]): string[] {
  * (เช่น แนบไฟล์แล้วกดยกเลิกโดยไม่บันทึก หรือเปลี่ยนรูปในลายเซ็น)
  */
 export async function cleanupOrphanFiles(): Promise<{ removed: number }> {
-  const [{ data: camps, error }, { data: settings }] = await Promise.all([
-    db().from("campaigns").select("*"),
-    db().from("settings").select("*").eq("id", 1).single(),
-  ]);
-  if (error) throw new Error("อ่านข้อความไม่ได้: " + error.message);
-
-  const usedAtt = new Set((camps ?? []).flatMap((c) => ((c.attachments ?? []) as Attachment[]).map((a) => a.path)));
-  const usedImg = new Set(
-    imagePathsInAll([...(camps ?? []).flatMap((c) => [c.body_html, c.followup_body_html]), settings?.signature_html ?? ""]),
-  );
+  const { usedAtt, usedImg } = await referencedFiles();
   const cutoff = Date.now() - 24 * 60 * 60 * 1000;
 
   let removed = 0;
@@ -121,8 +112,30 @@ export async function cleanupOrphanFiles(): Promise<{ removed: number }> {
   return { removed };
 }
 
-/** ลบไฟล์แนบ/รูปที่ไม่ใช้แล้ว */
+/** ไฟล์ทั้งหมดที่ยังมีข้อความ (หรือลายเซ็น) ใช้อยู่ */
+async function referencedFiles(): Promise<{ usedAtt: Set<string>; usedImg: Set<string> }> {
+  const [{ data: camps, error }, { data: settings }] = await Promise.all([
+    db().from("campaigns").select("attachments,body_html,followup_body_html"),
+    db().from("settings").select("*").eq("id", 1).single(),
+  ]);
+  if (error) throw new Error("อ่านข้อความไม่ได้: " + error.message);
+  return {
+    usedAtt: new Set((camps ?? []).flatMap((c) => ((c.attachments ?? []) as Attachment[]).map((a) => a.path))),
+    usedImg: new Set(
+      imagePathsInAll([...(camps ?? []).flatMap((c) => [c.body_html, c.followup_body_html]), settings?.signature_html ?? ""]),
+    ),
+  };
+}
+
+/**
+ * ลบไฟล์แนบ/รูปที่ไม่ใช้แล้ว — เรียกหลังลบ/แก้ข้อความ
+ * ข้ามไฟล์ที่ข้อความอื่นยังใช้อยู่ (ข้อความที่ "ทำสำเนา" มาใช้ไฟล์ชุดเดียวกัน)
+ */
 export async function deleteFiles(attachmentPaths: string[], imagePaths: string[]) {
-  if (attachmentPaths.length) await db().storage.from(ATTACH_BUCKET).remove(attachmentPaths);
-  if (imagePaths.length) await db().storage.from(IMAGE_BUCKET).remove(imagePaths);
+  if (!attachmentPaths.length && !imagePaths.length) return;
+  const { usedAtt, usedImg } = await referencedFiles();
+  const att = attachmentPaths.filter((p) => !usedAtt.has(p));
+  const img = imagePaths.filter((p) => !usedImg.has(p));
+  if (att.length) await db().storage.from(ATTACH_BUCKET).remove(att);
+  if (img.length) await db().storage.from(IMAGE_BUCKET).remove(img);
 }

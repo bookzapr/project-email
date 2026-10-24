@@ -32,6 +32,8 @@ export type WizardInitial = {
   attachments: Attachment[];
   followup_attach?: boolean;
   cc_emails?: string[];
+  /** รายชื่อตั้งต้น (ตอน "ทำสำเนา" จากข้อความเดิม) */
+  recipients?: ParsedRecipient[];
 };
 
 export function CampaignWizard({
@@ -75,7 +77,7 @@ export function CampaignWizard({
   const [sampleName, setSampleName] = useState("สมชาย ใจดี");
   const [mobileTab, setMobileTab] = useState<"write" | "preview">("write");
   const [followupBody, setFollowupBody] = useState(initial.followup_body_html ?? "");
-  const [recipients, setRecipients] = useState<ParsedRecipient[]>([]);
+  const [recipients, setRecipients] = useState<ParsedRecipient[]>(initial.recipients ?? []);
   const [sendNow, setSendNow] = useState(mode === "create");
   const [sendAt, setSendAt] = useState(initial.send_at_local);
 
