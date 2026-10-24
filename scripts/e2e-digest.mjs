@@ -119,7 +119,7 @@ try {
     await page.getByRole("button", { name: /ส่งสรุปตัวอย่างตอนนี้/ }).click();
     await page.getByText(/ส่งสรุปแล้วไปที่/).waitFor({ timeout: 40_000 });
     const mail = await waitDigest(t, TAG);
-    const sec = (title) => mail.text.split("\n").find((l) => l.trim().startsWith(title)) ?? "";
+    const sec = (title) => mail.text.split("\n").find((l) => l.trim().startsWith(title + ":")) ?? "";
     assert(sec("ส่งงานวันนี้").includes(`${TAG}-ส่งแล้ว`), "ไม่มีคนส่งงานวันนี้");
     assert(sec("ยังไม่ส่ง").includes(`${TAG}-รออยู่`), "ไม่มีคนที่ยังไม่ส่ง");
     assert(sec("มีปัญหา").includes(`${TAG}-เด้ง`), "ไม่มีคนที่มีปัญหา");
