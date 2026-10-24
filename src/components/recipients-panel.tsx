@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useOptimistic, useState, useTransition } from "react";
+import { useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import { RecipientPicker } from "@/components/recipient-picker";
 import { StatusBadge } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
@@ -104,8 +104,9 @@ export function RecipientsPanel({
 
       {/* ---- รายชื่อ ---- */}
       {list.length > 0 && (
-        <div className="overflow-hidden rounded-2xl bg-white shadow-[0_4px_24px_-8px_rgb(13_148_136/0.18)] ring-1 ring-emerald-100">
-          <div className="flex flex-col gap-2 border-b border-emerald-100 bg-emerald-50/50 p-3 sm:flex-row sm:items-center">
+        // ไม่ใช้ overflow-hidden เพื่อให้เมนู ⋯ แสดงเต็ม ไม่ถูกตัดขอบ
+        <div className="rounded-2xl bg-white shadow-[0_4px_24px_-8px_rgb(13_148_136/0.18)] ring-1 ring-emerald-100">
+          <div className="flex flex-col gap-2 rounded-t-2xl border-b border-emerald-100 bg-emerald-50/50 p-3 sm:flex-row sm:items-center">
             <div className="flex flex-wrap gap-1.5 text-sm">
               {FILTERS.filter((f) => f.key === "all" || counts[f.key] > 0).map((f) => (
                 <button
@@ -169,7 +170,7 @@ const AVATAR: Record<RecipientStatus, string> = {
 
 function Row({ r, run }: { r: Recipient; run: (id: string, a: RecipientAction) => void }) {
   return (
-    <li className="flex items-start gap-3 px-4 py-3 transition hover:bg-teal-50/40">
+    <li className="flex items-start gap-3 px-4 py-3 transition last:rounded-b-2xl hover:bg-teal-50/40">
       <span
         className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-linear-to-br ${AVATAR[r.status]} text-sm font-bold text-white shadow`}
         aria-hidden
@@ -238,31 +239,55 @@ function RowMenu({ r, run }: { r: Recipient; run: (id: string, a: RecipientActio
   if (r.status === "stopped") items.push({ label: "ยกเลิกการหยุด", action: "resume" });
   items.push({ label: "ลบออก", action: "delete", danger: true, confirm: `ลบ ${r.name} ออกจากข้อความนี้?` });
 
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  // คลิกที่อื่น (รวมถึงเปิดเมนูของคนอื่น) หรือกด Esc → ปิดเมนูนี้ จะได้ไม่ซ้อนกัน
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
   return (
-    <details className="relative shrink-0">
-      <summary
-        className="flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-lg text-xl leading-none text-slate-500 hover:bg-slate-100 [&::-webkit-details-marker]:hidden"
+    <div ref={box} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`flex h-8 w-8 items-center justify-center rounded-lg text-xl leading-none text-slate-500 hover:bg-slate-100 ${open ? "bg-slate-100" : ""}`}
         aria-label="ตัวเลือก"
+        aria-expanded={open}
       >
         ⋯
-      </summary>
-      <div className="absolute right-0 z-10 mt-1 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
-        {items.map((it) => (
-          <button
-            key={it.action}
-            type="button"
-            className={`block w-full px-3 py-2 text-left text-sm hover:bg-slate-50 ${it.danger ? "text-red-600" : "text-slate-700"}`}
-            onClick={(e) => {
-              (e.currentTarget.closest("details") as HTMLDetailsElement).open = false;
-              if (it.confirm && !window.confirm(it.confirm)) return;
-              run(r.id, it.action);
-            }}
-          >
-            {it.label}
-          </button>
-        ))}
-      </div>
-    </details>
+      </button>
+      {open && (
+        <div className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+          {items.map((it) => (
+            <button
+              key={it.action}
+              type="button"
+              className={`block w-full px-3 py-2 text-left text-sm hover:bg-slate-50 ${it.danger ? "text-red-600" : "text-slate-700"}`}
+              onClick={() => {
+                setOpen(false);
+                if (it.confirm && !window.confirm(it.confirm)) return;
+                run(r.id, it.action);
+              }}
+            >
+              {it.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
