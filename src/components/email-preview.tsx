@@ -46,11 +46,13 @@ export function EmailPreview({
         </div>
       </div>
       <div className="email-content px-4 pt-4 pb-6 sm:pl-[4.25rem]">
-        {isBlankHtml(html) ? (
-          <p className="text-slate-400">(ยังไม่มีเนื้อหา)</p>
-        ) : (
-          <div dangerouslySetInnerHTML={{ __html: fillHtml(withSignature(html, sender.signature), sampleName) }} />
-        )}
+        {/* แสดงลายเซ็นเสมอ แม้ยังไม่ได้พิมพ์เนื้อหา จะได้รู้ว่ามีลายเซ็นต่อท้าย */}
+        {isBlankHtml(html) && <p className="text-slate-400">(ยังไม่มีเนื้อหา)</p>}
+        <div
+          dangerouslySetInnerHTML={{
+            __html: fillHtml(withSignature(isBlankHtml(html) ? "" : html, sender.signature), sampleName),
+          }}
+        />
       </div>
       {attachments && attachments.length > 0 && (
         <div className="border-t border-slate-100 px-4 py-3 sm:pl-[4.25rem]">
