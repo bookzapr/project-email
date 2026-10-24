@@ -13,7 +13,7 @@ export const STATUS_LABEL: Record<RecipientStatus, string> = {
 
 export const STATUS_STYLE: Record<RecipientStatus, string> = {
   pending: "bg-slate-100 text-slate-700 ring-1 ring-slate-200",
-  sent: "bg-indigo-100 text-indigo-800 ring-1 ring-indigo-200",
+  sent: "bg-sky-100 text-sky-800 ring-1 ring-sky-200",
   replied: "bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200",
   followed_up: "bg-amber-100 text-amber-800 ring-1 ring-amber-200",
   failed: "bg-rose-100 text-rose-800 ring-1 ring-rose-200",

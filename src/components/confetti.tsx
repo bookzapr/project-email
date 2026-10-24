@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-const COLORS = ["#6366f1", "#8b5cf6", "#a855f7", "#ec4899", "#10b981", "#f59e0b", "#38bdf8"];
+const COLORS = ["#6ee7b7", "#5eead4", "#86efac", "#a7f3d0", "#fde68a", "#fbcfe8", "#a5f3fc"];
 
 /** ฉลองเล็กๆ ตอนตั้งส่งสำเร็จ (เล่นครั้งเดียว ~3 วินาที, ปิดเองถ้าผู้ใช้ตั้งค่าลดการเคลื่อนไหว) */
 export function Confetti({ pieces = 70 }: { pieces?: number }) {

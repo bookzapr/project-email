@@ -168,19 +168,19 @@ export function CampaignWizard({
               onClick={() => go(s)}
               className={`flex w-full items-center gap-2 rounded-2xl px-2.5 py-2.5 text-left transition ${
                 s === step
-                  ? "bg-linear-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-violet-500/30"
+                  ? "bg-linear-to-r from-teal-500 to-emerald-500 text-white shadow-lg shadow-teal-500/30"
                   : i < current
-                    ? "bg-white text-violet-800 ring-1 ring-violet-200 hover:bg-violet-50"
-                    : "bg-white/60 text-slate-500 ring-1 ring-indigo-100"
+                    ? "bg-white text-teal-800 ring-1 ring-teal-200 hover:bg-teal-50"
+                    : "bg-white/60 text-slate-500 ring-1 ring-emerald-100"
               }`}
             >
               <span
                 className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                   s === step
-                    ? "bg-white text-violet-700"
+                    ? "bg-white text-teal-700"
                     : i < current
                       ? "bg-linear-to-br from-emerald-400 to-teal-500 text-white"
-                      : "bg-indigo-100 text-indigo-400"
+                      : "bg-emerald-100 text-emerald-400"
                 }`}
               >
                 {i < current ? "✓" : i + 1}
@@ -195,7 +195,7 @@ export function CampaignWizard({
       {step === "content" && (
         <>
           {/* มือถือ: สลับระหว่างเขียน / ดูตัวอย่าง */}
-          <div className="flex gap-1 rounded-2xl bg-white/70 p-1 text-sm ring-1 ring-indigo-100 lg:hidden">
+          <div className="flex gap-1 rounded-2xl bg-white/70 p-1 text-sm ring-1 ring-emerald-100 lg:hidden">
             {(["write", "preview"] as const).map((t) => (
               <button
                 key={t}
@@ -205,7 +205,7 @@ export function CampaignWizard({
                   setMobileTab(t);
                 }}
                 className={`flex-1 rounded-xl px-3 py-1.5 transition ${
-                  mobileTab === t ? "bg-linear-to-r from-indigo-600 to-violet-600 font-semibold text-white shadow" : "text-indigo-900/70"
+                  mobileTab === t ? "bg-linear-to-r from-teal-500 to-emerald-500 font-semibold text-white shadow" : "text-emerald-900/70"
                 }`}
               >
                 {t === "write" ? "✍️ เขียน" : "👀 ดูตัวอย่าง"}
@@ -216,10 +216,10 @@ export function CampaignWizard({
           <div className="grid items-start gap-4 lg:grid-cols-2">
             <div className={`card space-y-4 ${mobileTab === "write" ? "" : "hidden lg:block"}`}>
               {/* หัวอีเมลแบบ Gmail: ถึง / Cc / หัวข้อ */}
-              <div className="divide-y divide-indigo-100 overflow-hidden rounded-xl ring-1 ring-indigo-200">
-                <div className="flex items-center gap-3 bg-indigo-50/60 px-3 py-2 text-sm">
-                  <span className="w-12 shrink-0 text-indigo-900/60">ถึง</span>
-                  <span className="text-indigo-900/80">
+              <div className="divide-y divide-emerald-100 overflow-hidden rounded-xl ring-1 ring-emerald-200">
+                <div className="flex items-center gap-3 bg-emerald-50/60 px-3 py-2 text-sm">
+                  <span className="w-12 shrink-0 text-emerald-900/60">ถึง</span>
+                  <span className="text-emerald-900/80">
                     {mode === "create"
                       ? recipients.length
                         ? `ผู้รับ ${recipients.length} คน (ส่งแยกทีละคน)`
@@ -228,7 +228,7 @@ export function CampaignWizard({
                   </span>
                 </div>
                 <div className="flex items-center gap-3 bg-white px-3">
-                  <label htmlFor="cc" className="w-12 shrink-0 text-sm text-indigo-900/60">
+                  <label htmlFor="cc" className="w-12 shrink-0 text-sm text-emerald-900/60">
                     Cc
                   </label>
                   <input
@@ -240,7 +240,7 @@ export function CampaignWizard({
                   />
                 </div>
                 <div className="flex items-center gap-3 bg-white px-3">
-                  <label htmlFor="subject" className="w-12 shrink-0 text-sm font-semibold text-indigo-950">
+                  <label htmlFor="subject" className="w-12 shrink-0 text-sm font-semibold text-emerald-950">
                     หัวข้อ
                   </label>
                   <input

@@ -62,16 +62,16 @@ async function Detail({ params, searchParams }: Pick<Props, "params" | "searchPa
 
 function Header({ c }: { c: Campaign }) {
   return (
-    <div className="card fade-up space-y-3 border-t-4 border-t-violet-500">
+    <div className="card fade-up space-y-3 border-t-4 border-t-teal-500">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <h1 className="min-w-0 flex-1 text-xl font-bold break-words text-indigo-950 sm:text-2xl">{c.subject}</h1>
+        <h1 className="min-w-0 flex-1 text-xl font-bold break-words text-emerald-950 sm:text-2xl">{c.subject}</h1>
         {c.paused && <span className="badge bg-zinc-200 text-zinc-700">⏸ หยุดชั่วคราว</span>}
       </div>
       <div className="flex flex-wrap gap-2 text-sm">
-        <span className="rounded-full bg-indigo-50 px-3 py-1 text-indigo-800 ring-1 ring-indigo-100">
+        <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-800 ring-1 ring-emerald-100">
           🗓 ส่ง {formatDateTime(c.send_at)}
         </span>
-        <span className="rounded-full bg-violet-50 px-3 py-1 text-violet-800 ring-1 ring-violet-100">
+        <span className="rounded-full bg-teal-50 px-3 py-1 text-teal-800 ring-1 ring-teal-100">
           🔁 {describeFollowup(c.followup_after_minutes)}
           {c.followup_after_minutes > 0 && (c.followup_body_html ? " (ข้อความใหม่)" : " (ข้อความเดิม)")}
         </span>
@@ -81,8 +81,8 @@ function Header({ c }: { c: Campaign }) {
           </span>
         )}
       </div>
-      <details className="rounded-xl border border-indigo-100 bg-white">
-        <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-violet-700">👀 ดูเนื้อหาอีเมล</summary>
+      <details className="rounded-xl border border-emerald-100 bg-white">
+        <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-teal-700">👀 ดูเนื้อหาอีเมล</summary>
         <div className="email-content border-t border-slate-100 px-3 py-3" dangerouslySetInnerHTML={{ __html: c.body_html }} />
         {c.followup_body_html && (
           <>

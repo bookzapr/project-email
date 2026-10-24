@@ -25,7 +25,7 @@ export function NavLinks({ path }: { path: string }) {
             key={l.href}
             href={l.href}
             className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
-              active ? "bg-white text-violet-700 shadow" : "text-white/90 hover:bg-white/15 hover:text-white"
+              active ? "bg-white text-teal-700 shadow" : "text-teal-900/80 hover:bg-white/60 hover:text-teal-900"
             } ${l.href === "/campaigns/new" ? "hidden sm:inline-flex" : ""}`}
           >
             {l.label}

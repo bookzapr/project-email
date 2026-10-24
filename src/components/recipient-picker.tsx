@@ -65,7 +65,7 @@ export function RecipientPicker({
     <div className="space-y-4">
       {/* ---- เลือกวิธี ---- */}
       <div>
-        <p className="mb-2 text-sm font-semibold text-indigo-950">เพิ่มผู้รับด้วยวิธีไหน?</p>
+        <p className="mb-2 text-sm font-semibold text-emerald-950">เพิ่มผู้รับด้วยวิธีไหน?</p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {METHODS.map((m) => (
             <button
@@ -74,19 +74,19 @@ export function RecipientPicker({
               onClick={() => setMethod(m.key)}
               className={`rounded-2xl border-2 p-3 text-left transition ${
                 method === m.key
-                  ? "border-violet-500 bg-linear-to-br from-indigo-50 to-violet-100 shadow-md shadow-violet-200"
-                  : "border-indigo-100 bg-white hover:-translate-y-0.5 hover:border-violet-300 hover:shadow"
+                  ? "border-teal-500 bg-linear-to-br from-emerald-50 to-teal-100 shadow-md shadow-teal-200"
+                  : "border-emerald-100 bg-white hover:-translate-y-0.5 hover:border-teal-300 hover:shadow"
               }`}
             >
               <div className="text-2xl">{m.icon}</div>
-              <div className="mt-1 font-semibold text-indigo-950">{m.title}</div>
+              <div className="mt-1 font-semibold text-emerald-950">{m.title}</div>
               <div className="text-xs text-slate-500">{m.desc}</div>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="rounded-2xl border border-indigo-100 bg-indigo-50/40 p-4">
+      <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4">
         {method === "paste" && <PastePanel onText={mergeText} />}
         {method === "upload" && <UploadPanel onText={mergeText} />}
         {method === "type" && <TypePanel onAdd={(r) => merge([r]) > 0} />}
@@ -135,7 +135,7 @@ function PastePanel({ onText }: { onText: (text: string) => number }) {
             setText("");
           }
         }}
-        className="input min-h-28 border-2 border-dashed border-violet-300 bg-white font-mono text-sm"
+        className="input min-h-28 border-2 border-dashed border-teal-300 bg-white font-mono text-sm"
         placeholder={"👉 คลิกตรงนี้ แล้วกด Ctrl+V (มือถือ: กดค้างแล้วเลือก วาง)\n\nหรือพิมพ์บรรทัดละคน เช่น  สมชาย ใจดี, somchai@gmail.com"}
         aria-label="วางรายชื่อ"
       />
@@ -157,11 +157,11 @@ function PastePanel({ onText }: { onText: (text: string) => number }) {
 function ExampleTable() {
   return (
     <div className="text-sm">
-      <p className="mb-1.5 text-indigo-950">
-        ใน Excel ให้มีคอลัมน์แบบนี้ แล้วลากคลุมเฉพาะรายชื่อ กด <kbd className="rounded bg-white px-1.5 ring-1 ring-indigo-200">Ctrl+C</kbd>
+      <p className="mb-1.5 text-emerald-950">
+        ใน Excel ให้มีคอลัมน์แบบนี้ แล้วลากคลุมเฉพาะรายชื่อ กด <kbd className="rounded bg-white px-1.5 ring-1 ring-emerald-200">Ctrl+C</kbd>
       </p>
       <div className="overflow-x-auto">
-        <table className="min-w-max overflow-hidden rounded-lg bg-white text-left text-xs ring-1 ring-indigo-200">
+        <table className="min-w-max overflow-hidden rounded-lg bg-white text-left text-xs ring-1 ring-emerald-200">
           <thead className="bg-emerald-600 text-white">
             <tr>
               <th className="px-3 py-1.5">ชื่อ</th>
@@ -169,7 +169,7 @@ function ExampleTable() {
               <th className="px-3 py-1.5">CC (ไม่บังคับ)</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-indigo-50">
+          <tbody className="divide-y divide-emerald-50">
             <tr>
               <td className="px-3 py-1">สมชาย ใจดี</td>
               <td className="px-3 py-1">somchai@gmail.com</td>
@@ -245,11 +245,11 @@ function UploadPanel({ onText }: { onText: (text: string) => number }) {
           void readFile(e.dataTransfer.files[0]);
         }}
         className={`flex w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed px-4 py-8 text-center transition ${
-          drag ? "border-violet-500 bg-violet-100" : "border-violet-300 bg-white hover:bg-violet-50"
+          drag ? "border-teal-500 bg-teal-100" : "border-teal-300 bg-white hover:bg-teal-50"
         }`}
       >
         <span className="text-4xl">{busy ? "⏳" : "📁"}</span>
-        <span className="mt-2 font-semibold text-indigo-950">
+        <span className="mt-2 font-semibold text-emerald-950">
           {busy ? "กำลังอ่านไฟล์..." : "คลิกเพื่อเลือกไฟล์ หรือลากไฟล์มาวางตรงนี้"}
         </span>
         <span className="text-xs text-slate-500">รองรับ Excel (.xlsx) และ CSV · แถวแรกเป็นหัวตารางได้</span>
@@ -266,7 +266,7 @@ function UploadPanel({ onText }: { onText: (text: string) => number }) {
         }}
       />
       {error && <p className="alert-error">{error}</p>}
-      <button type="button" className="text-sm text-violet-700 underline" onClick={downloadTemplate}>
+      <button type="button" className="text-sm text-teal-700 underline" onClick={downloadTemplate}>
         ⬇ ดาวน์โหลดไฟล์ตัวอย่าง (เปิดด้วย Excel แล้วกรอกรายชื่อ)
       </button>
     </div>
@@ -387,7 +387,7 @@ function BookPanel({ onAdd, existing }: { onAdd: (list: ParsedRecipient[]) => nu
     <div className="space-y-4">
       {book.campaigns.length > 0 && (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <span className="shrink-0 text-sm font-semibold text-indigo-950">ใช้รายชื่อชุดเดิมทั้งหมด:</span>
+          <span className="shrink-0 text-sm font-semibold text-emerald-950">ใช้รายชื่อชุดเดิมทั้งหมด:</span>
           <select value={campaignId} onChange={(e) => setCampaignId(e.target.value)} className="input py-1.5 text-sm">
             <option value="">— เลือกข้อความเก่า —</option>
             {book.campaigns.map((c) => (
@@ -430,22 +430,22 @@ function BookPanel({ onAdd, existing }: { onAdd: (list: ParsedRecipient[]) => nu
             </button>
           )}
         </div>
-        <ul className="max-h-72 divide-y divide-indigo-50 overflow-auto rounded-xl bg-white ring-1 ring-indigo-100">
+        <ul className="max-h-72 divide-y divide-emerald-50 overflow-auto rounded-xl bg-white ring-1 ring-emerald-100">
           {shown.slice(0, 300).map((c) => {
             const already = inList.has(c.email);
             return (
               <li key={c.email}>
-                <label className={`flex items-center gap-3 px-3 py-2 text-sm ${already ? "opacity-50" : "cursor-pointer hover:bg-violet-50"}`}>
+                <label className={`flex items-center gap-3 px-3 py-2 text-sm ${already ? "opacity-50" : "cursor-pointer hover:bg-teal-50"}`}>
                   <input
                     type="checkbox"
-                    className="h-4 w-4 accent-violet-600"
+                    className="h-4 w-4 accent-teal-600"
                     disabled={already}
                     checked={already || picked.has(c.email)}
                     onChange={() => toggle(c.email)}
                   />
                   <span className="min-w-0 flex-1 truncate font-medium">{c.name}</span>
                   <span className="min-w-0 flex-1 truncate text-slate-500">{c.email}</span>
-                  {already && <span className="text-xs text-violet-700">อยู่ในรายชื่อแล้ว</span>}
+                  {already && <span className="text-xs text-teal-700">อยู่ในรายชื่อแล้ว</span>}
                 </label>
               </li>
             );
@@ -503,7 +503,7 @@ function RecipientTable({
 
   if (value.length === 0) {
     return (
-      <div className="rounded-2xl border-2 border-dashed border-indigo-200 bg-white/60 py-8 text-center text-slate-500">
+      <div className="rounded-2xl border-2 border-dashed border-emerald-200 bg-white/60 py-8 text-center text-slate-500">
         <div className="text-3xl">🧑‍🤝‍🧑</div>
         ยังไม่มีผู้รับ — เลือกวิธีด้านบนเพื่อเพิ่มรายชื่อ
       </div>
@@ -511,8 +511,8 @@ function RecipientTable({
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-indigo-100">
-      <div className="flex flex-wrap items-center justify-between gap-2 bg-linear-to-r from-indigo-600 to-violet-600 px-4 py-2.5 text-white">
+    <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-emerald-100">
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-linear-to-r from-teal-500 to-emerald-500 px-4 py-2.5 text-white">
         <span className="font-semibold">👥 รายชื่อผู้รับ {value.length.toLocaleString("th-TH")} คน</span>
         <div className="flex items-center gap-3 text-sm">
           {problemCount > 0 && <span className="rounded-full bg-rose-500 px-2 py-0.5">⚠️ ต้องแก้ {problemCount}</span>}
@@ -525,7 +525,7 @@ function RecipientTable({
           </button>
         </div>
       </div>
-      <p className="border-b border-indigo-50 bg-indigo-50/50 px-4 py-1.5 text-xs text-indigo-900/70">
+      <p className="border-b border-emerald-50 bg-emerald-50/50 px-4 py-1.5 text-xs text-emerald-900/70">
         ✏️ คลิกที่ชื่อ อีเมล หรือ CC เพื่อแก้ไขได้เลย · CC หลายคนคั่นด้วย , หรือ ;
       </p>
       <div className="max-h-[28rem] overflow-auto">
@@ -541,7 +541,7 @@ function RecipientTable({
           </thead>
           <tbody>
             {value.slice(0, limit).map((r, i) => (
-              <tr key={i} className={problems[i] ? "bg-rose-50" : i % 2 ? "bg-indigo-50/30" : ""}>
+              <tr key={i} className={problems[i] ? "bg-rose-50" : i % 2 ? "bg-emerald-50/30" : ""}>
                 <td className="px-3 py-1 align-top text-xs text-slate-400">{i + 1}</td>
                 <td className="px-1 py-1 align-top">
                   <CellInput value={r.name} onCommit={(v) => update(i, { name: v })} label={`ชื่อแถว ${i + 1}`} />
@@ -586,7 +586,7 @@ function RecipientTable({
           </tbody>
         </table>
       </div>
-      <div className="flex flex-wrap items-center gap-2 border-t border-indigo-50 px-4 py-2">
+      <div className="flex flex-wrap items-center gap-2 border-t border-emerald-50 px-4 py-2">
         <button type="button" className="btn btn-sm" onClick={() => onChange([...value, { name: "", email: "", cc: [] }])}>
           + เพิ่มแถวว่าง
         </button>
@@ -629,8 +629,8 @@ function CellInput({
       }}
       aria-label={label}
       placeholder={placeholder}
-      className={`w-full min-w-0 rounded-lg border px-2 py-1 transition focus:border-violet-500 focus:bg-white focus:ring-2 focus:ring-violet-200 focus:outline-none ${
-        invalid ? "border-rose-300 bg-white" : "border-transparent bg-transparent hover:border-indigo-200"
+      className={`w-full min-w-0 rounded-lg border px-2 py-1 transition focus:border-teal-500 focus:bg-white focus:ring-2 focus:ring-teal-200 focus:outline-none ${
+        invalid ? "border-rose-300 bg-white" : "border-transparent bg-transparent hover:border-emerald-200"
       }`}
     />
   );

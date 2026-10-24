@@ -3,7 +3,7 @@ import { STATUS_LABEL, STATUS_STYLE, type RecipientStatus } from "@/lib/types";
 // ---------- โครงร่างระหว่างโหลด (แสดงทันที ไม่ต้องรอข้อมูล) ----------
 
 function Bar({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded-lg bg-indigo-100 ${className}`} />;
+  return <div className={`animate-pulse rounded-lg bg-emerald-100 ${className}`} />;
 }
 
 export function ListSkeleton({ rows = 3 }: { rows?: number }) {
@@ -61,15 +61,15 @@ export function QuotaLine({ used, limit }: { used: number; limit: number }) {
       ? "from-rose-500 to-red-500"
       : pct >= 80
         ? "from-amber-400 to-orange-500"
-        : "from-sky-400 via-indigo-500 to-violet-500";
+        : "from-sky-400 via-emerald-500 to-teal-500";
   return (
-    <div className="flex items-center gap-3 rounded-2xl bg-white/70 px-4 py-2.5 text-sm text-indigo-900/70 ring-1 ring-indigo-100 backdrop-blur">
+    <div className="flex items-center gap-3 rounded-2xl bg-white/70 px-4 py-2.5 text-sm text-emerald-900/70 ring-1 ring-emerald-100 backdrop-blur">
       <span className="shrink-0">📤 โควตา 24 ชม.</span>
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-indigo-100">
+      <div className="h-2 flex-1 overflow-hidden rounded-full bg-emerald-100">
         <div className={`h-full rounded-full bg-linear-to-r ${color}`} style={{ width: `${Math.max(pct, 2)}%` }} />
       </div>
       <span className="shrink-0">
-        <b className="text-indigo-950">{used.toLocaleString("th-TH")}</b> / {limit.toLocaleString("th-TH")}
+        <b className="text-emerald-950">{used.toLocaleString("th-TH")}</b> / {limit.toLocaleString("th-TH")}
       </span>
     </div>
   );

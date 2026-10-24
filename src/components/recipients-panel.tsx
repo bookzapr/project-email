@@ -11,10 +11,10 @@ import type { RecipientAction } from "@/app/(app)/campaigns/actions";
 type Filter = "all" | "waiting" | "replied" | "problem" | "pending" | "stopped";
 
 const FILTERS: { key: Filter; label: string; match: (s: RecipientStatus) => boolean; tile: string; icon: string }[] = [
-  { key: "all", label: "ทั้งหมด", match: () => true, tile: "from-indigo-500 to-violet-500", icon: "👥" },
-  { key: "waiting", label: "รอส่งงาน", match: (s) => s === "sent" || s === "followed_up", tile: "from-amber-400 to-orange-500", icon: "⏳" },
-  { key: "replied", label: "ส่งงานแล้ว", match: (s) => s === "replied", tile: "from-emerald-400 to-teal-500", icon: "✅" },
-  { key: "problem", label: "มีปัญหา", match: (s) => s === "failed", tile: "from-rose-400 to-pink-500", icon: "⚠️" },
+  { key: "all", label: "ทั้งหมด", match: () => true, tile: "from-teal-100 to-cyan-100 text-teal-900 ring-teal-200", icon: "👥" },
+  { key: "waiting", label: "รอส่งงาน", match: (s) => s === "sent" || s === "followed_up", tile: "from-amber-100 to-orange-100 text-amber-900 ring-amber-200", icon: "⏳" },
+  { key: "replied", label: "ส่งงานแล้ว", match: (s) => s === "replied", tile: "from-emerald-100 to-green-200 text-emerald-900 ring-emerald-200", icon: "✅" },
+  { key: "problem", label: "มีปัญหา", match: (s) => s === "failed", tile: "from-rose-100 to-pink-100 text-rose-900 ring-rose-200", icon: "⚠️" },
   { key: "pending", label: "ยังไม่ได้ส่ง", match: (s) => s === "pending", tile: "", icon: "🕒" },
   { key: "stopped", label: "หยุดแล้ว", match: (s) => s === "stopped", tile: "", icon: "⏹" },
 ];
@@ -78,13 +78,13 @@ export function RecipientsPanel({
             key={f.key}
             type="button"
             onClick={() => setFilter(f.key)}
-            className={`relative overflow-hidden rounded-2xl bg-linear-to-br ${f.tile} p-3 text-left text-white shadow-lg transition hover:-translate-y-0.5 sm:p-4 ${
-              filter === f.key ? "ring-4 ring-violet-300 ring-offset-2" : "opacity-90 hover:opacity-100"
+            className={`relative overflow-hidden rounded-2xl bg-linear-to-br ${f.tile} p-3 text-left shadow-md ring-1 transition hover:-translate-y-0.5 sm:p-4 ${
+              filter === f.key ? "ring-4! ring-teal-400! ring-offset-2" : "hover:shadow-lg"
             }`}
           >
             <span className="absolute -top-2 -right-1 text-5xl opacity-25">{f.icon}</span>
             <div className="text-3xl font-bold">{counts[f.key]}</div>
-            <div className="text-sm font-medium text-white/90">{f.label}</div>
+            <div className="text-sm font-medium opacity-80">{f.label}</div>
           </button>
         ))}
       </div>
@@ -95,7 +95,7 @@ export function RecipientsPanel({
       ) : (
         <button
           type="button"
-          className="w-full rounded-2xl border-2 border-dashed border-violet-300 bg-white/60 py-3 font-semibold text-violet-700 transition hover:border-violet-500 hover:bg-violet-50"
+          className="w-full rounded-2xl border-2 border-dashed border-teal-300 bg-white/60 py-3 font-semibold text-teal-700 transition hover:border-teal-500 hover:bg-teal-50"
           onClick={() => setAdding(true)}
         >
           + เพิ่มผู้รับ
@@ -104,8 +104,8 @@ export function RecipientsPanel({
 
       {/* ---- รายชื่อ ---- */}
       {list.length > 0 && (
-        <div className="overflow-hidden rounded-2xl bg-white shadow-[0_4px_24px_-8px_rgb(79_70_229/0.18)] ring-1 ring-indigo-100">
-          <div className="flex flex-col gap-2 border-b border-indigo-100 bg-indigo-50/50 p-3 sm:flex-row sm:items-center">
+        <div className="overflow-hidden rounded-2xl bg-white shadow-[0_4px_24px_-8px_rgb(13_148_136/0.18)] ring-1 ring-emerald-100">
+          <div className="flex flex-col gap-2 border-b border-emerald-100 bg-emerald-50/50 p-3 sm:flex-row sm:items-center">
             <div className="flex flex-wrap gap-1.5 text-sm">
               {FILTERS.filter((f) => f.key === "all" || counts[f.key] > 0).map((f) => (
                 <button
@@ -114,8 +114,8 @@ export function RecipientsPanel({
                   onClick={() => setFilter(f.key)}
                   className={`rounded-full px-3 py-1 font-medium transition ${
                     filter === f.key
-                      ? "bg-linear-to-r from-indigo-600 to-violet-600 text-white shadow"
-                      : "bg-white text-indigo-900 ring-1 ring-indigo-200 hover:bg-violet-50"
+                      ? "bg-linear-to-r from-teal-500 to-emerald-500 text-white shadow"
+                      : "bg-white text-emerald-900 ring-1 ring-emerald-200 hover:bg-teal-50"
                   }`}
                 >
                   {f.label} {counts[f.key]}
@@ -146,7 +146,7 @@ export function RecipientsPanel({
           {shown.length === 0 ? (
             <p className="p-6 text-center text-sm text-slate-500">ไม่มีผู้รับในกลุ่มนี้</p>
           ) : (
-            <ul className="divide-y divide-indigo-50">
+            <ul className="divide-y divide-emerald-50">
               {shown.map((r) => (
                 <Row key={r.id} r={r} run={run} />
               ))}
@@ -160,7 +160,7 @@ export function RecipientsPanel({
 
 const AVATAR: Record<RecipientStatus, string> = {
   pending: "from-slate-300 to-slate-400",
-  sent: "from-indigo-400 to-violet-500",
+  sent: "from-sky-300 to-cyan-400",
   followed_up: "from-amber-400 to-orange-500",
   replied: "from-emerald-400 to-teal-500",
   failed: "from-rose-400 to-pink-500",
@@ -169,7 +169,7 @@ const AVATAR: Record<RecipientStatus, string> = {
 
 function Row({ r, run }: { r: Recipient; run: (id: string, a: RecipientAction) => void }) {
   return (
-    <li className="flex items-start gap-3 px-4 py-3 transition hover:bg-violet-50/40">
+    <li className="flex items-start gap-3 px-4 py-3 transition hover:bg-teal-50/40">
       <span
         className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-linear-to-br ${AVATAR[r.status]} text-sm font-bold text-white shadow`}
         aria-hidden

@@ -5,42 +5,43 @@
 }
 
 /* =====================================================================
-   ธีมน้ำเงิน-ม่วง: พื้นหลังไล่สีอ่อน + แถบด้านบนไล่สีเข้ม + การ์ดขาวขอบสี
+   ธีมเขียวมิ้นต์พาสเทล: พื้นหลังมิ้นต์อ่อน + แถบด้านบนมิ้นต์ + การ์ดขาวขอบเขียวอ่อน
+   ปุ่มหลักใช้เขียวมิ้นต์เข้มขึ้น เพื่อให้ตัวหนังสือขาวอ่านชัด
    ===================================================================== */
 body {
-  color: #1e1b4b;
+  color: #134e4a;
   background:
-    radial-gradient(1200px 600px at -10% -10%, rgb(199 210 254 / 0.55), transparent 60%),
-    radial-gradient(900px 500px at 110% 0%, rgb(233 213 255 / 0.6), transparent 60%),
-    radial-gradient(900px 600px at 50% 120%, rgb(186 230 253 / 0.45), transparent 60%),
-    #f5f6ff;
+    radial-gradient(1200px 600px at -10% -10%, rgb(167 243 208 / 0.55), transparent 60%),
+    radial-gradient(900px 500px at 110% 0%, rgb(153 246 228 / 0.5), transparent 60%),
+    radial-gradient(900px 600px at 50% 120%, rgb(217 249 157 / 0.35), transparent 60%),
+    #f2fbf7;
   background-attachment: fixed;
 }
 
 /* ---------- ชิ้นส่วนที่ใช้ซ้ำทั้งเว็บ ---------- */
 @layer components {
   .label {
-    @apply mb-1 block text-sm font-semibold text-indigo-950;
+    @apply mb-1 block text-sm font-semibold text-teal-950;
   }
   .hint {
     @apply mt-1 text-xs text-slate-500;
   }
   .input {
-    @apply block w-full rounded-xl border border-indigo-200 bg-white px-3 py-2 text-base text-slate-900
-      shadow-sm transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-4 focus:ring-violet-200/60
+    @apply block w-full rounded-xl border border-emerald-200 bg-white px-3 py-2 text-base text-slate-900
+      shadow-sm transition placeholder:text-slate-400 focus:border-teal-400 focus:ring-4 focus:ring-teal-100
       focus:outline-none disabled:bg-slate-100;
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border border-indigo-200 bg-white px-4 py-2
-      text-sm font-medium text-indigo-900 shadow-sm transition hover:-translate-y-px hover:border-indigo-300
-      hover:bg-indigo-50 hover:shadow active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-4 py-2
+      text-sm font-medium text-teal-900 shadow-sm transition hover:-translate-y-px hover:border-emerald-300
+      hover:bg-emerald-50 hover:shadow active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50
       disabled:hover:translate-y-0;
   }
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-xl bg-linear-to-r from-indigo-600 via-violet-600
-      to-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-violet-500/30 transition
-      hover:-translate-y-px hover:shadow-lg hover:shadow-violet-500/40 hover:brightness-110 active:translate-y-0
-      disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl bg-linear-to-r from-teal-500 to-emerald-500
+      px-4 py-2 text-sm font-semibold text-white shadow-md shadow-emerald-500/30 transition [text-shadow:0_1px_1px_rgb(0_0_0/0.15)]
+      hover:-translate-y-px hover:from-teal-600 hover:to-emerald-600 hover:shadow-lg hover:shadow-emerald-500/40
+      active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0;
   }
   .btn-danger {
     @apply inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-white px-4 py-2
@@ -51,12 +52,12 @@ body {
     @apply px-2.5 py-1 text-xs;
   }
   .card {
-    @apply rounded-2xl border border-white/70 bg-white/90 p-4 shadow-[0_4px_24px_-8px_rgb(79_70_229/0.18)]
-      ring-1 ring-indigo-100 backdrop-blur sm:p-5;
+    @apply rounded-2xl border border-white/70 bg-white/90 p-4 shadow-[0_4px_24px_-8px_rgb(13_148_136/0.18)]
+      ring-1 ring-emerald-100 backdrop-blur sm:p-5;
   }
   .card-hover {
-    @apply transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_32px_-10px_rgb(124_58_237/0.35)]
-      hover:ring-violet-300;
+    @apply transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_32px_-10px_rgb(13_148_136/0.35)]
+      hover:ring-teal-300;
   }
   .alert-error {
     @apply rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700;
@@ -68,7 +69,7 @@ body {
     @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap;
   }
   .page-title {
-    @apply bg-linear-to-r from-indigo-700 via-violet-700 to-purple-700 bg-clip-text text-2xl font-bold
+    @apply bg-linear-to-r from-teal-700 via-emerald-600 to-green-600 bg-clip-text text-2xl font-bold
       text-transparent sm:text-3xl;
   }
 }
@@ -110,7 +111,8 @@ body {
   }
 }
 .header-gradient {
-  background-image: linear-gradient(110deg, #4338ca, #6d28d9, #9333ea, #4f46e5);
+  /* มิ้นต์พาสเทล → เขียวอ่อน → ฟ้าอมเขียว */
+  background-image: linear-gradient(110deg, #a7f3d0, #99f6e4, #bbf7d0, #a5f3fc, #a7f3d0);
   background-size: 300% 300%;
   animation: gradient-pan 16s ease infinite;
 }

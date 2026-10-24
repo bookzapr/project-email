@@ -343,7 +343,7 @@ try {
     const buf = await all.body();
     assert(buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf, "ไม่มี BOM (Excel จะแสดงภาษาไทยเพี้ยน)");
     const text = buf.toString("utf8");
-    assert(text.includes("ชื่อ,อีเมล,สถานะ"), "หัวตารางไม่ถูกต้อง");
+    assert(text.includes("ชื่อ,อีเมล,CC,สถานะ"), "หัวตารางไม่ถูกต้อง");
     assert(text.includes("ยูไอหนึ่ง") && text.includes("ยูไอสอง"), "ไม่มีรายชื่อ");
     const replied = (await (await page.request.get(`${BASE}/campaigns/${campaignId}/export?filter=replied`)).text()).trim();
     assert(replied.split(/\r?\n/).length === 1, "กลุ่ม 'ส่งงานแล้ว' ควรมีแต่หัวตาราง");
@@ -451,8 +451,8 @@ try {
     await m.locator(".ProseMirror").first().click();
     await m.keyboard.type("ทดสอบ");
     await m.getByRole("button", { name: "ถัดไป →" }).click();
-    await m.fill("#paste", `มือถือ, ${addr("m1")}`);
-    await m.getByRole("button", { name: "เพิ่มรายชื่อเหล่านี้" }).click();
+    await m.getByLabel("วางรายชื่อ").fill(`มือถือ, ${addr("m1")}`);
+    await m.getByRole("button", { name: "เพิ่มรายชื่อที่พิมพ์" }).click();
     for (const label of ["ขั้น ②", "ขั้น ③"]) {
       const over = await m.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       if (over > 1) bad.push(`${label} (+${over}px)`);
