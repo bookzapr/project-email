@@ -52,12 +52,19 @@ body {
 }
 
 /* ---------- เนื้อหาอีเมล (ทั้งในตัวแก้ไขและหน้าตัวอย่าง) ---------- */
+/* ค่าเดียวกับที่ใส่ในอีเมลจริง (src/lib/mailer.ts) — หน้าตาในตัวแก้ไข/ตัวอย่าง = ที่ผู้รับเห็น */
 .email-content {
-  line-height: 1.7;
+  font-family: Tahoma, "Leelawadee UI", "Noto Sans Thai", Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #1f2937;
   overflow-wrap: anywhere;
 }
 .email-content p {
-  margin: 0 0 0.75em;
+  margin: 0 0 12px;
+}
+.email-content li p {
+  margin: 0;
 }
 .email-content h2 {
   font-size: 1.25em;
@@ -84,9 +91,10 @@ body {
   text-decoration: underline;
 }
 .email-content blockquote {
-  border-left: 3px solid #cbd5e1;
-  padding-left: 0.75em;
-  color: #475569;
+  margin: 0 0 12px;
+  border-left: 3px solid #cccccc;
+  padding-left: 12px;
+  color: #555555;
 }
 .email-content hr {
   border-color: #e2e8f0;

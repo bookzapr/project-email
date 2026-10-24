@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { CampaignWizard } from "@/components/campaign-wizard";
 import { FormSkeleton } from "@/components/ui";
-import { getCampaign } from "@/lib/data";
+import { getCampaign, getSettings } from "@/lib/data";
 import { toBangkokInput } from "@/lib/format";
 import { sendTestDraft, updateCampaign } from "../../actions";
 
@@ -22,7 +22,7 @@ export default function EditCampaignPage({ params }: PageProps<"/campaigns/[id]/
 
 async function EditForm({ params }: { params: PageProps<"/campaigns/[id]/edit">["params"] }) {
   const { id } = await params;
-  const c = await getCampaign(id);
+  const [c, settings] = await Promise.all([getCampaign(id), getSettings()]);
   if (!c) notFound();
 
   return (
@@ -32,6 +32,7 @@ async function EditForm({ params }: { params: PageProps<"/campaigns/[id]/edit">[
       </p>
       <CampaignWizard
         mode="edit"
+        sender={{ name: settings.sender_name, email: process.env.GMAIL_USER ?? "" }}
         cancelHref={`/campaigns/${c.id}`}
         onUpdate={updateCampaign.bind(null, c.id)}
         onTest={sendTestDraft}

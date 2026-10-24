@@ -43,10 +43,16 @@ export type OutgoingEmail = {
   senderName: string;
 };
 
+// ค่าเดียวกับ .email-content ใน globals.css — ตัวอย่างบนเว็บจึงตรงกับที่ผู้รับเห็น
+const EMAIL_CSS = `p{margin:0 0 12px}li p{margin:0}ul,ol{margin:0 0 12px;padding-left:24px}h2{font-size:20px;margin:16px 0 8px}h3{font-size:17px;margin:16px 0 8px}hr{border:0;border-top:1px solid #e2e8f0;margin:16px 0}a{color:#1d4ed8}`;
+const QUOTE_STYLE = "margin:0 0 12px;border-left:3px solid #cccccc;padding-left:12px;color:#555555;";
+
 function wrapHtml(inner: string): string {
-  return `<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;">
-<div style="font-family:Tahoma,'Leelawadee UI','Noto Sans Thai',Arial,sans-serif;font-size:15px;line-height:1.7;color:#1f2937;">
-${inner}
+  // ใส่ style ของ blockquote แบบ inline ด้วย (โปรแกรมอีเมลบางตัวไม่อ่าน <style>)
+  const body = inner.replace(/<blockquote(?: style="([^"]*)")?>/g, (_, s) => `<blockquote style="${QUOTE_STYLE}${s ?? ""}">`);
+  return `<!doctype html><html><head><meta charset="utf-8"><style>${EMAIL_CSS}</style></head><body style="margin:0;padding:0;">
+<div style="font-family:Tahoma,'Leelawadee UI','Noto Sans Thai',Arial,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;">
+${body}
 </div></body></html>`;
 }
 

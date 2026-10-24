@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
+import { EmailPreview } from "@/components/email-preview";
 import { RecipientPicker } from "@/components/recipient-picker";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { UNIT_LABEL, UNIT_MINUTES, splitMinutes, type DelayUnit } from "@/lib/format";
 import type { ParsedRecipient } from "@/lib/parse-recipients";
-import { fillHtml, fillText, isBlankHtml } from "@/lib/template";
+import { isBlankHtml } from "@/lib/template";
 import type { FormState } from "@/lib/types";
 import type { CampaignDraft } from "@/app/(app)/campaigns/actions";
 
@@ -35,9 +36,12 @@ export function CampaignWizard({
   onCreate,
   onUpdate,
   onTest,
+  sender,
 }: {
   mode: "create" | "edit";
   initial: WizardInitial;
+  /** ผู้ส่งที่ผู้รับจะเห็น (ใช้ในตัวอย่างอีเมล) */
+  sender: { name: string; email: string };
   cancelHref: string;
   onCreate?: (draft: CampaignDraft, recipients: ParsedRecipient[]) => Promise<FormState>;
   onUpdate?: (draft: CampaignDraft) => Promise<FormState>;
@@ -48,10 +52,18 @@ export function CampaignWizard({
   const [error, setError] = useState<string | null>(null);
 
   // ---- ข้อมูลในฟอร์ม ----
-  // เนื้อหาอีเมลระหว่างพิมพ์เก็บใน ref (ไม่ re-render ทุกตัวอักษร = พิมพ์ลื่น) แล้วคัดลอกลง state ตอนเปลี่ยนขั้น
+  // เนื้อหาอีเมลระหว่างพิมพ์เก็บใน ref ทันที ส่วนตัวอย่างอีเมลอัปเดตตามหลัง 0.2 วินาที (พิมพ์ลื่น ไม่หน่วง)
   const [subject, setSubject] = useState(initial.subject);
   const bodyRef = useRef(initial.body_html);
   const [body, setBody] = useState(initial.body_html);
+  const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onBodyChange = (html: string) => {
+    bodyRef.current = html;
+    if (previewTimer.current) clearTimeout(previewTimer.current);
+    previewTimer.current = setTimeout(() => setBody(html), 200);
+  };
+  const [sampleName, setSampleName] = useState("สมชาย ใจดี");
+  const [mobileTab, setMobileTab] = useState<"write" | "preview">("write");
   const [followupBody, setFollowupBody] = useState(initial.followup_body_html ?? "");
   const [recipients, setRecipients] = useState<ParsedRecipient[]>([]);
   const [sendNow, setSendNow] = useState(mode === "create");
@@ -147,31 +159,63 @@ export function CampaignWizard({
 
       {/* ---- ขั้นที่ 1: เขียนอีเมล ---- */}
       {step === "content" && (
-        <div className="card space-y-4">
-          <div>
-            <label htmlFor="subject" className="label">
-              หัวข้ออีเมล
-            </label>
-            <input
-              id="subject"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              maxLength={300}
-              className="input"
-              placeholder="เช่น ขอเอกสารประกอบการพิจารณา"
-              autoFocus
-            />
+        <>
+          {/* มือถือ: สลับระหว่างเขียน / ดูตัวอย่าง */}
+          <div className="flex gap-1 rounded-lg bg-slate-100 p-1 text-sm lg:hidden">
+            {(["write", "preview"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => {
+                  setBody(bodyRef.current);
+                  setMobileTab(t);
+                }}
+                className={`flex-1 rounded-md px-3 py-1.5 ${mobileTab === t ? "bg-white font-medium shadow-sm" : "text-slate-600"}`}
+              >
+                {t === "write" ? "เขียน" : "ดูตัวอย่าง"}
+              </button>
+            ))}
           </div>
-          <div>
-            <span className="label">เนื้อหา</span>
-            <RichTextEditor
-              defaultValue={body}
-              placeholder="เรียน คุณ{ชื่อ} ..."
-              onChange={(html) => (bodyRef.current = html)}
-            />
-            <p className="hint">กดปุ่ม “+ ใส่ชื่อผู้รับ” ตรงไหน ระบบจะเปลี่ยนเป็นชื่อของแต่ละคนให้เองตอนส่ง</p>
+
+          <div className="grid items-start gap-4 lg:grid-cols-2">
+            <div className={`card space-y-4 ${mobileTab === "write" ? "" : "hidden lg:block"}`}>
+              <div>
+                <label htmlFor="subject" className="label">
+                  หัวข้ออีเมล
+                </label>
+                <input
+                  id="subject"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  maxLength={300}
+                  className="input"
+                  placeholder="เช่น ขอเอกสารประกอบการพิจารณา"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <span className="label">เนื้อหา</span>
+                <RichTextEditor defaultValue={body} placeholder="เรียน คุณ{ชื่อ} ..." onChange={onBodyChange} />
+                <p className="hint">กดปุ่ม “+ ใส่ชื่อผู้รับ” ตรงไหน ระบบจะเปลี่ยนเป็นชื่อของแต่ละคนให้เองตอนส่ง</p>
+              </div>
+            </div>
+
+            <div className={`space-y-2 lg:sticky lg:top-16 ${mobileTab === "preview" ? "" : "hidden lg:block"}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm font-medium text-slate-700">ตัวอย่างที่ผู้รับจะเห็น</span>
+                <label className="flex items-center gap-2 text-sm text-slate-500">
+                  ชื่อผู้รับตัวอย่าง
+                  <input
+                    value={sampleName}
+                    onChange={(e) => setSampleName(e.target.value)}
+                    className="input w-36 py-1 text-sm"
+                  />
+                </label>
+              </div>
+              <EmailPreview subject={subject} html={body} sampleName={sampleName} sender={sender} />
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* ---- ขั้นที่ 2: ผู้รับ ---- */}
@@ -275,6 +319,8 @@ export function CampaignWizard({
             sendNow={sendNow}
             sendAt={sendAt}
             followupMinutes={followupMinutes}
+            sender={sender}
+            fallbackName={sampleName}
           />
 
           <div className="card flex flex-col gap-2">
@@ -360,9 +406,11 @@ function Summary(props: {
   sendNow: boolean;
   sendAt: string;
   followupMinutes: number;
+  sender: { name: string; email: string };
+  fallbackName: string;
 }) {
   const [open, setOpen] = useState(false);
-  const sample = props.recipients[0]?.name ?? "สมชาย";
+  const sample = props.recipients[0]?.name ?? props.fallbackName;
   const when = props.sendNow
     ? "ทันที (ภายใน 1 นาที)"
     : props.sendAt
@@ -396,26 +444,24 @@ function Summary(props: {
       </button>
       {open && (
         <div className="space-y-3">
-          <PreviewBox subject={fillText(props.subject, sample)} html={fillHtml(props.bodyHtml, sample)} />
+          <EmailPreview
+            label="อีเมลแรก"
+            subject={props.subject}
+            html={props.bodyHtml}
+            sampleName={sample}
+            sender={props.sender}
+          />
           {props.followupMinutes > 0 && (
-            <PreviewBox
-              label="อีเมลส่งซ้ำ"
-              subject={`Re: ${fillText(props.subject, sample)}`}
-              html={fillHtml(props.followupHtml ?? props.bodyHtml, sample)}
+            <EmailPreview
+              label="อีเมลส่งซ้ำ (ต่อในเธรดเดิม)"
+              subject={`Re: ${props.subject}`}
+              html={props.followupHtml ?? props.bodyHtml}
+              sampleName={sample}
+              sender={props.sender}
             />
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-function PreviewBox({ label = "อีเมลแรก", subject, html }: { label?: string; subject: string; html: string }) {
-  return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-      <div className="border-b border-slate-100 bg-slate-50 px-3 py-1.5 text-xs text-slate-500">{label}</div>
-      <div className="px-3 pt-2 font-medium">{subject}</div>
-      <div className="email-content px-3 py-2" dangerouslySetInnerHTML={{ __html: html }} />
     </div>
   );
 }

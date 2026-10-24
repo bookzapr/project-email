@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { CampaignWizard } from "@/components/campaign-wizard";
 import { FormSkeleton } from "@/components/ui";
 import { requireAuth } from "@/lib/auth";
+import { getSettings } from "@/lib/data";
 import { nextHourIso, toBangkokInput } from "@/lib/format";
 import { createCampaignWithRecipients, sendTestDraft } from "../actions";
 
@@ -23,9 +24,11 @@ export default function NewCampaignPage() {
 async function NewForm() {
   await requireAuth();
   await connection();
+  const settings = await getSettings();
   return (
     <CampaignWizard
       mode="create"
+      sender={{ name: settings.sender_name, email: process.env.GMAIL_USER ?? "" }}
       cancelHref="/"
       onCreate={createCampaignWithRecipients}
       onTest={sendTestDraft}
