@@ -14,6 +14,18 @@ import { cleanupOrphanFiles } from "@/lib/storage";
 
 export const maxDuration = 60;
 
+// cron-job.org (ฟรี) รอคำตอบได้ 30 วินาที — แบ่งเวลา: ตรวจกล่องจดหมาย ≤12 วิ + ส่งอีเมล ~12 วิ
+const IMAP_BUDGET_MS = 12_000;
+
+/** ถ้า Gmail ตอบช้า ไม่รอจนหมดเวลา — รอบนี้ข้ามไปก่อน (งานที่ค้างยังถือล็อกอยู่ รอบถัดไปจะไม่ทำซ้อน) */
+function withinBudget<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("Gmail ตอบช้า ข้ามการตรวจรอบนี้")), ms);
+  });
+  return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
+}
+
 function authorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
@@ -31,14 +43,14 @@ async function handle(request: Request) {
   let replies: ReplyCheckResult | null = null;
   let replyError: string | null = null;
   try {
-    replies = await checkReplies();
+    replies = await withinBudget(checkReplies(), IMAP_BUDGET_MS);
   } catch (err) {
     replyError = (err as Error).message;
     console.error("[cron] ตรวจกล่องจดหมายไม่สำเร็จ:", err);
   }
 
   try {
-    // cron-job.org (ฟรี) รอคำตอบได้ 30 วินาที จึงจำกัดเวลาส่งต่อรอบไว้ ~12 วินาที ที่เหลือส่งรอบถัดไป
+    // จำกัดเวลาส่งต่อรอบไว้ ~12 วินาที ที่เหลือส่งรอบถัดไป
     const sent = await runSendRound({
       batchSize: 10,
       timeBudgetMs: 12_000,
